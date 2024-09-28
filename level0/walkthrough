@@ -1,0 +1,35 @@
+1.- Desensamblamos el binario level0 con gdb
+2.- Insertamos breakpoin en el main e inspeccionamos el código
+3.- 
+  [...]
+  0x08048ed1 <+17>:	mov    DWORD PTR [esp],eax
+  0x08048ed4 <+20>:	call   0x8049710 <atoi>
+  0x08048ed9 <+25>:	cmp    eax,0x1a7
+  0x08048ede <+30>:	jne    0x8048f58 <main+152>
+  [...]
+4.- Vemos que llama a la función atoi
+5.- Luego compara el valor retornado por atoi con 0x1a7 (423)
+6.- En caso de que el valor de (retorno de atoi) no sea 423 el binario termina la ejecución
+  [...]
+  0x08048ed9 <+25>:	cmp    eax,0x1a7
+  0x08048ede <+30>:	jne    0x8048f58 <main+152>
+  [...]
+7.- En caso de que el eax sea 423 sigue la ejecución
+8.- Nos asigna uid y gid del propietario del binario, en este caso level1
+  [...]
+  0x08048f21 <+97>:	call   0x8054700 <setresgid>
+  [...]
+  0x08048f3d <+125>:	call   0x8054690 <setresuid>
+  [...]
+9.- Sigue la ejecución y hace una llamada a execv
+  [...]
+  0x08048f51 <+145>:	call   0x8054640 <execv>
+  [...]
+10.- Podemos ver los argumento que se pasan a execv en gdb
+  (gdb) x $eax
+  0xffffd710: 0x080f2718
+  (gdb) x/s 0x080f2718
+  0x80f2718:  "/bin/sh"
+11.- Vemos que nos da una shell
+12.- Hacemos cat a ../level1/.pass
+

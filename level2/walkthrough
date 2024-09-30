@@ -1,0 +1,59 @@
+1.- Descargamos el binario level2 y lo analizaremos con gdb 
+2.- Vemos que hay dos funciones que puede ser interesantes:
+  (gdb) info functions
+  [...]
+  0x080484d4  p
+  0x0804853f  main
+  [...]
+3.- Vemos que main lo único que hace es una llamada a la función p()
+   0x0804853f <+0>:	push   ebp
+   0x08048540 <+1>:	mov    ebp,esp
+   0x08048542 <+3>:	and    esp,0xfffffff0
+   0x08048545 <+6>:	call   0x80484d4 <p>
+   0x0804854a <+11>:	leave
+   0x0804854b <+12>:	ret
+4.- Desensamblamos p
+5.- Vemos que hay una llamada a gets() que sabemos que es vulnerable
+  [...]
+    0x080484ed <+25>:	call   0x80483c0 <gets@plt>
+  [...]
+6.- Justo despues hay un codigo que guarda el valor de retorno que hay en el stack en eax
+  [...]
+    0x080484f2 <+30>:	mov    eax,DWORD PTR [ebp+0x4]
+    0x080484f5 <+33>:	mov    DWORD PTR [ebp-0xc],eax
+    0x080484f8 <+36>:	mov    eax,DWORD PTR [ebp-0xc]
+  [...]
+7.- Para luego comprobar que eax no tenga un valor que empieze por 0xb 
+  [...]
+    0x080484fb <+39>:	and    eax,0xb0000000
+    0x08048500 <+44>:	cmp    eax,0xb0000000
+  [...]
+8.- Esto es una forma de proteger la return adress para no poder albergar una dirección asignada
+    al stack y evitar overflows ya que en este binario el stack siempre se encuentra en la misma dirección
+    (gdb) info proc mapping
+    [...]
+   	  0xbffdf000 0xc0000000    0x21000        0x0 [stack] 
+   	Corresponde a este builtin de c:
+   	  __builtin_return_address(0);
+9.- Todo esto sucede porque el binarion está compilado como no-pie lo que hará que las direcciónes 
+    del stak, heap, funciones... sean siempre las mismas
+10.- Vemos que en caso de que la return adress no empiece por 0xb llegamos a un strdup
+  [...]
+    0x08048538 <+100>:	call   0x80483e0 <strdup@plt>
+  [...]
+11.- Esta fúncion usa malloc para albergar una cadena el el heap.
+12.- Podemos usar el heap para insertar un shellcode y hacer el overflow en el gets para que la 
+    return adress apunte a la dirección de retorno de strdup ya que siempre va a ser la misma
+  (gdb)b strdup
+  (gdb)run
+  (gdb)n
+  (gdb)n
+  [...]
+    0x08048538 <+100>:	call   0x80483e0 <strdup@plt>
+    => 0x0804853d <+105>:	leave
+  [...]
+  (gdb)x $eax
+  0x804a008:	0x00004343
+  [...]
+
+

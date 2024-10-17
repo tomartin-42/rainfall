@@ -1,0 +1,31 @@
+1.- Tras analizar el binario no hay funciones relevantes a parte de main()
+
+2.- Tambien tenemos dos variables globales que son char *service y char *auth
+
+3.- El main() principalmente es un bucle do - while que hace de menú
+
+4.- Con la opción "auth " se hace un malloc(4) sobre la variable auth, una comprobación de buff <= 30 y
+  de ser <=30 un strcpy(auth, buffer + 5)
+
+5.- Con la opcion "reset" se hace un free(auth)
+
+6.- Con la opción service se hace strncmp(buff, "service", 7) sobre la variable service
+
+7.- Col la opción "login" se comprueba que auth[32] != 0
+  .- Si auth[32] == 0 se imprime "Pasword:\n" y continua desde el principio
+  .- Si auth[32] != 0 el binario ejecuta un sytem("/bin/sh") con SUID level9
+
+8.- Por cada vuelta del bucle se nos muestra el valor de los punteros de auth y service
+
+9.- Vemos que cada vez que generamos un puntero tanto para auth o service está 16 bytes a continucación del anterio.
+  Esto sucede porque malloc() emplaza el puntero a continuación del aterior
+
+10.- Para conseguir entrar en el if que nos da sytem("/bin/sh") necesitamos:
+  - Generar un puntero para auth -> "auth "
+  - Generamos un puntero para service -> "service"
+  - Volvemos a generar un puntero para service -> "service"
+  - Ahora tenemos un puntero auth y un service que está 32 bytes por encima de auth
+  - Como somos propietarios de la memoria de auth y service podemos acceder a la memoria de service por auth
+  - Entonces auth[32] es accesible y no es 0
+  - Tecleamos -> "login" y tenemos la "sh" de level9 y podemos acceder al .pass de level9
+

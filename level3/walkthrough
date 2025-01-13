@@ -63,18 +63,39 @@
 14.- La funcón printf tiene una funcionalidad que es la de almacenar algún tipo de valor en una variable. 
     Tiene una flag que es %n que nos permite obtener el valor numérico de los caracteres imprimidos hasta
     el %n y almacenarlo en una variable. En esté caso se almacena el valor numérico de x es 4.
-    [...]
+    [...] (ejemplo)
     printf("HOLA%n\n", &x);
     printf("x= %d\n", x);
     [...]
     
 15.- También, con la función printf podemos alterar la posicion de una flag con [num]$
-    [...]
+    [...] (ejemplo)
     printf("%2$d es el segundo argumento, %1$d es el primero\n", 10, 20);
     [...]
     Esto imprimirá: `20 es el segundo argumento, 10 es el primero`
 
 16.- Usaremos el padding de una flag para insertar un numero arbitrario de caracteres
+
+    -------------
+    | 0x804988c |<---
+    -------------   |
+                    |
+    high adr        |    
+    -------------   |
+    | stack     |   |
+    -------------   |
+    | 200       |   |
+    -------------   | <- (0x40)
+    | b7fd1ac0  |   |
+    -------------   |
+    | b7ff37d0  |   |
+    -------------   |
+   *| 8c980408  | --|
+    -------------
+    | ...       | 
+    -------------
+    low adr
+
 
 17.- Vamos a montar la cadena formateada
     1.- La dirección de donde obtiene el valor eax en little endian: \x8c\x98\x04\x08

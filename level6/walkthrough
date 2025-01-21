@@ -55,6 +55,17 @@
 8.- Al hacer una reserva de 64 y no limitar argv[1] podemos hacer un overflow sobre el heap para sobreescribir
   rip y llamar a la función n() que nos dará la flag
 
+  High adr
+  Heap
+  --------------            \       --------------           
+  | malloc(4)  | <-- *m()   |       | n() adr    | <-- call()
+  --------------            |       -------------- 
+  | ...        |            >  -->  | ... AAAA   |
+  | ...        |            |       | AAAA ...   |
+  | malloc(64) | <-- arg[1] |       | malloc(64) | <-- "A"*72 + (n() adr)
+  --------------            /       --------------
+  Low adr                   
+
 9.- Probamos hacer prueba y error para averiguar el offset para el overflow o podemos usar https://wiremask.eu/tools/buffer-overflow-pattern-generator/?
 
 10.- El offset es 72 y vamos a montar la cadena

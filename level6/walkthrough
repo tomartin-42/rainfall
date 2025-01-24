@@ -53,7 +53,7 @@
   [...]
 
 8.- Al hacer una reserva de 64 y no limitar argv[1] podemos hacer un overflow sobre el heap para sobreescribir
-  rip y llamar a la función n() que nos dará la flag
+  en el heap el puntero a m() para llamar a la función n() que nos dará la flag
 
   High adr
   Heap

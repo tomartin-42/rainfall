@@ -1,23 +1,113 @@
 1.- Tras analizar el binario no hay funciones relevantes a parte de main()
 
 2.- Tambien tenemos dos variables globales que son char *service y char *auth
+  [...]
+  (gdb) info variables
+  [...]
+  0x08049aac  auth
+  0x08049ab0  service
+  [...]
 
 3.- El main() principalmente es un bucle do - while que hace de menú
+  [...]
+  0x08048586 <+34>:	mov    DWORD PTR [esp+0x8],ecx
+  0x0804858a <+38>:	mov    DWORD PTR [esp+0x4],edx
+  0x0804858e <+42>:	mov    DWORD PTR [esp],eax
+  0x08048591 <+45>:	call   0x8048410 <printf@plt>     ;print de los punteros de auth y service
+  [...]
+  0x0804859f <+59>:	mov    DWORD PTR [esp+0x4],0x80   ;el buffer(128) donde se guarda el fgets()
+  0x080485a7 <+67>:	lea    eax,[esp+0x20]             ;donde se guarda la opción
+  0x080485ab <+71>:	mov    DWORD PTR [esp],eax
+  0x080485ae <+74>:	call   0x8048440 <fgets@plt>      ;guarda la opción elegida
+  [...]
+  0x080485a7 <+67>:	lea    eax,[esp+0x20]
+  0x080485ab <+71>:	mov    DWORD PTR [esp],eax
+  0x080486dc <+376>:	jne    0x8048574 <main+16>      ;salta al principio del bucle
+  0x080486e2 <+382>:	mov    eax,ds:0x8049aac
+  [...]
 
 4.- Con la opción "auth " se hace un malloc(4) sobre la variable auth, una comprobación de buff <= 30 y
-  de ser <=30 un strcpy(auth, buffer + 5)
+  de ser <=30 un strcpy(auth, buffer + 5) 
+  [...]
+  (gdb) x/s 0x8048819
+  0x8048819:	"auth "
+  [...]
+  0x080485e4 <+128>:	mov    DWORD PTR [esp],0x4
+  0x080485eb <+135>:	call   0x8048470 <malloc@plt>
+  0x080485f0 <+140>:	mov    ds:0x8049aac,eax                       ;guarda el puntero en la variable auth
+  [...]
+  0x08048600 <+156>:	lea    eax,[esp+0x20]                         ;eax ahora es buffer
+  0x08048604 <+160>:	add    eax,0x5                                ;eax ahora el buffer + 5
+  [...]
+  0x080485cf <+107>:	repz cmps BYTE PTR ds:[esi],BYTE PTR es:[edi] ;strlen()
+  0x08048622 <+190>:	sub    eax,0x1
+  0x08048625 <+193>:	cmp    eax,0x1e                               ;compara el strlen con 30
+  0x08048628 <+196>:	ja     0x8048642 <main+222>                   ;si strlen >30 salta <main+222>
+  [...]
+  0x08048636 <+210>:	mov    DWORD PTR [esp+0x4],edx
+  0x0804863a <+214>:	mov    DWORD PTR [esp],eax
+  0x0804863d <+217>:	call   0x8048460 <strcpy@plt>                 ;strcpy(auth, buffer + 5)
 
 5.- Con la opcion "reset" se hace un free(auth)
+  [...]
+  (gdb) x/s 0x804881f
+  0x804881f:	"reset"
+  [...]
+  0x0804864d <+233>:	mov    ecx,0x5
+  0x08048652 <+238>:	mov    esi,edx
+  0x08048654 <+240>:	mov    edi,eax
+  0x08048656 <+242>:	repz cmps BYTE PTR ds:[esi],BYTE PTR es:[edi]   ;compara buffer con "reset"
+  [...]
+  0x0804866b <+263>:	mov    eax,ds:0x8049aac
+  0x08048670 <+268>:	mov    DWORD PTR [esp],eax
+  0x08048673 <+271>:	call   0x8048420 <free@plt>                     ;free de auth free(auth);
+  [...]
 
-6.- Con la opción service se hace strncmp(buff, "service", 7) sobre la variable service
+6.- Con la opción service se hace strdup (service = strdup(service + 7)) 
+  [...]
+  (gdb) x/s 0x8048825
+  0x8048825:	"service"
+  [...]
+  0x080486a1 <+317>:	lea    eax,[esp+0x20]           ;eax ahora es "service"
+  0x080486a5 <+321>:	add    eax,0x7
+  0x080486a8 <+324>:	mov    DWORD PTR [esp],eax
+  0x080486ab <+327>:	call   0x8048430 <strdup@plt>   ;service = strdup(sevice + 7) -> '\n'
+  [...]
 
 7.- Col la opción "login" se comprueba que auth[32] != 0
+  [...]
+  (gdb) x/s 0x804882d
+  0x804882d:	"login"
+  [...]
+  0x080486e7 <+387>:	mov    eax,DWORD PTR [eax+0x20]   ;mueve a eax eax[32]
+  0x080486ea <+390>:	test   eax,eax                    ;comprueba si eax = 0
+  0x080486ec <+392>:	je     0x80486ff <main+411>       ;salta si eax = 0
+  [...]
+
   .- Si auth[32] == 0 se imprime "Pasword:\n" y continua desde el principio
+
+  [...]
+  0x0804870b <+423>:	mov    DWORD PTR [esp+0xc],edx
+  0x0804870f <+427>:	mov    DWORD PTR [esp+0x8],0xa
+  0x08048717 <+435>:	mov    DWORD PTR [esp+0x4],0x1
+  0x0804871f <+443>:	mov    DWORD PTR [esp],eax
+  0x08048722 <+446>:	call   0x8048450 <fwrite@plt>
+  0x08048727 <+451>:	jmp    0x8048574 <main+16>
+  [...]
+
   .- Si auth[32] != 0 el binario ejecuta un sytem("/bin/sh") con SUID level9
+
+  [...]
+  0x080486ee <+394>:	mov    DWORD PTR [esp],0x8048833
+  0x080486f5 <+401>:	call   0x8048480 <system@plt>
+  [...]
+  (gdb) x/s 0x8048833
+  0x8048833:	"/bin/sh"
+  [...]
 
 8.- Por cada vuelta del bucle se nos muestra el valor de los punteros de auth y service
 
-9.- Vemos que cada vez que generamos un puntero tanto para auth o service está 16 bytes a continucación del anterio.
+9.- Vemos que cada vez que generamos un puntero tanto para auth o service está 16 bytes a continucación del anterior.
   Esto sucede porque malloc() emplaza el puntero a continuación del aterior
 
 10.- Para conseguir entrar en el if que nos da sytem("/bin/sh") necesitamos:
@@ -29,3 +119,12 @@
   - Entonces auth[32] es accesible y no es 0
   - Tecleamos -> "login" y tenemos la "sh" de level9 y podemos acceder al .pass de level9
 
+  High adr
+  ---------------
+  |   HEAP      |
+  ---------------
+  | service     | <- = auth[32] != 0 -> /bin/sh
+  | service     |       ^
+  | auth        | ------|
+  ---------------
+  low adr

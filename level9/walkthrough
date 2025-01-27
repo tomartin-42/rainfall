@@ -212,7 +212,21 @@ Le pasamos el patron como argv[1] desde gdb
     Program received signal SIGSEGV, Segmentation fault.
     0x08048682 in main ()
   [...]
-Con la herramienta online no da un offset de 108
+  (gdb) disassemble
+  [...]
+     0x08048680 <+140>:	mov    eax,DWORD PTR [eax]
+  => 0x08048682 <+142>:	mov    edx,DWORD PTR [eax]
+     0x08048684 <+144>:	mov    eax,DWORD PTR [esp+0x14]
+  [...]
+  (gdb) info registers 
+  eax            0x41366441	1094083649
+  ecx            0x67413567	1732326759
+  [...]
+  
+  Está fallando al intentar desrenferenciar eax en main<+142>
+  El valor que necesitamos en la herramienta online para calcular el offset es valor de eax
+
+  Con la herramienta online no da un offset de 108
 
 19.- Ahora necesitamos saber en que dirección se almacena la cadena cuando se ejecuta el memcpy()
   (gdb) disassemble main

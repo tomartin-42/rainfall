@@ -28,55 +28,64 @@
   [...]
   0x0804852e <+16>:    lea    eax,[ebp-0x30]
   0x08048531 <+19>:    mov    DWORD PTR [esp],eax
-  0x08048534 <+22>:    call   0x80484b4 <p>
-  0x08048539 <+27>:    mov    DWORD PTR [esp+0x4],0x80486a0
+  0x08048534 <+22>:    call   0x80484b4 <p>                   ;llamada a p(*str1)
+  0x08048539 <+27>:    mov    DWORD PTR [esp+0x4],0x80486a0   ;es la string " - "
   0x08048541 <+35>:    lea    eax,[ebp-0x1c]
   0x08048544 <+38>:    mov    DWORD PTR [esp],eax
-  0x08048547 <+41>:    call   0x80484b4 <p>
+  0x08048547 <+41>:    call   0x80484b4 <p>                   ;llamada a p(*str2)
   [...]
 
-4.- En la función p() encontramos que hace un read de stdin sobre un buffer de 4096 bytes 
+
+4.- Lo primero que hace p() es imprimir el 2º parametro que le manda pp() y es una cadean " - "
+  [...]
+  0x080484bd <+9>:	mov    eax,DWORD PTR [ebp+0xc] ;la cadena del 2º argumento " - "
+  0x080484c0 <+12>:	mov    DWORD PTR [esp],eax
+  0x080484c3 <+15>:	call   0x80483b0 <puts@plt>
+  [...]
+
+5.- En la función p() encontramos que hace un read de stdin sobre un buffer de 4096 bytes 
 
   p()
   [...]
-  0x080484c8 <+20>:	mov    DWORD PTR [esp+0x8],0x1000
-  0x080484d0 <+28>:	lea    eax,[ebp-0x1008]
-  0x080484d6 <+34>:	mov    DWORD PTR [esp+0x4],eax
-  0x080484da <+38>:	mov    DWORD PTR [esp],0x0
+  0x080484c8 <+20>:	mov    DWORD PTR [esp+0x8],0x1000   ;4096
+  0x080484d0 <+28>:	lea    eax,[ebp-0x1008]             ;buff 
+  0x080484d6 <+34>:	mov    DWORD PTR [esp+0x4],eax      
+  0x080484da <+38>:	mov    DWORD PTR [esp],0x0          ;stdin
   0x080484e1 <+45>:	call   0x8048380 <read@plt>
   [...]
 
-5.- Luego hace un strchr para buscar el caracter '\n' sobre la cadena que ha obtenido del read para luego sustituirlo por un NUL '\0'
+6.- Luego hace un strchr para buscar el caracter '\n' sobre la cadena que ha obtenido del read para luego sustituirlo por un NUL '\0'
   
   p()
   [...]
-  0x080484e6 <+50>:	mov    DWORD PTR [esp+0x4],0xa
-  0x080484ee <+58>:	lea    eax,[ebp-0x1008]
+  0x080484e6 <+50>:	mov    DWORD PTR [esp+0x4],0xa      ;'\n'
+  0x080484ee <+58>:	lea    eax,[ebp-0x1008]             ;el buff
   0x080484f4 <+64>:	mov    DWORD PTR [esp],eax
   0x080484f7 <+67>:	call   0x80483d0 <strchr@plt>
-  0x080484fc <+72>:	mov    BYTE PTR [eax],0x0
+  0x080484fc <+72>:	mov    BYTE PTR [eax],0x0           ;sustitulle el caracter '\n' por '\0' (NULL)
   [...]
 
-6.- Por último hace un strncpy para copiar la cadena que tiene el el los 20 primeros bytes del buffer a *str que le pasamos como parámetro a la función p()
+7.- Por último hace un strncpy para copiar la cadena que tiene el el los 20 primeros bytes del buffer a *str que le pasamos como parámetro a la función p()
 
   p()
   [...]
-  0x080484ff <+75>:	lea    eax,[ebp-0x1008]
-  0x08048505 <+81>:	mov    DWORD PTR [esp+0x8],0x14
+  0x080484ff <+75>:	lea    eax,[ebp-0x1008]             ;el buff
+  0x08048505 <+81>:	mov    DWORD PTR [esp+0x8],0x14     ;20 carácteres
   0x0804850d <+89>:	mov    DWORD PTR [esp+0x4],eax
-  0x08048511 <+93>:	mov    eax,DWORD PTR [ebp+0x8]
+  0x08048511 <+93>:	mov    eax,DWORD PTR [ebp+0x8]      ;le str del parametro de p(str)
   0x08048514 <+96>:	mov    DWORD PTR [esp],eax
   0x08048517 <+99>:	call   0x80483f0 <strncpy@plt>
   [...]
 
-7.- Volvemos a la función pp(). Copia por medio de strcpy() el primer puntero obtenido por p() a dest que se le pasa como parámetro a pp()
+8.- Volvemos a la función pp(). Copia por medio de strcpy() el primer puntero obtenido por p() a dest que se le pasa como parámetro a pp()
   
   pp()
   [...]
-  0x0804854c <+46>:	lea    eax,[ebp-0x30]
+  0x0804854c <+46>:	lea    eax,[ebp-0x30]             ;str del parametro de pp(str)
   0x0804854f <+49>:	mov    DWORD PTR [esp+0x4],eax
-  0x08048553 <+53>:	mov    eax,DWORD PTR [ebp+0x8]
+  0x08048553 <+53>:	mov    eax,DWORD PTR [ebp+0x8]    ;la str 
   0x08048556 <+56>:	mov    DWORD PTR [esp],eax
+  0x08048559 <+59>:	call   0x80483a0 <strcpy@plt>
   [...]
 
 8.- 

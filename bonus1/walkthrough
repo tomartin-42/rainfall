@@ -1,0 +1,85 @@
+1.- Desensamblamos con gdb
+
+2.- Vemos que solo hay una función relevante que es main
+  [...]
+  (gdb) info functions
+  All defined functions:
+  [...]
+    0x08048424  main
+  [...]
+
+3.- desensamblamos main() y vemos:
+  Reserva del stack frame
+  [...]
+  0x08048424 <+0>:	push   ebp
+  0x08048425 <+1>:	mov    ebp,esp
+  0x08048427 <+3>:	and    esp,0xfffffff0
+  0x0804842a <+6>:	sub    esp,0x40
+  [...]
+
+4.- Luego hace una llamada a atoi() con argv[1]
+  [...]
+  0x0804842d <+9>:	mov    eax,DWORD PTR [ebp+0xc]    ;manda argv[1] a eax
+  0x08048430 <+12>:	add    eax,0x4                  
+  0x08048433 <+15>:	mov    eax,DWORD PTR [eax]
+  0x08048435 <+17>:	mov    DWORD PTR [esp],eax        ;carga eax a esp para pasar argv[1] como parametro a atoi(argv[1])
+  0x08048438 <+20>:	call   0x8048360 <atoi@plt>       ;llama a atoi(argv[1])
+  [...]
+
+5.- Hace una comparación del resultado de atoi() y lo compara con 9
+  [...]
+  0x0804843d <+25>:	mov    DWORD PTR [esp+0x3c],eax
+  0x08048441 <+29>:	cmp    DWORD PTR [esp+0x3c],0x9
+  [...]
+  si es <= que 9 sale del binario ya que salta a <main+127>
+
+6.- Si el resultado del atoi(argv[1]) es <= 9 hace un memcopy algo raro.
+  Recordemos el prototipo de memcpy -> void *memcpy(void dest, void org, size_t n)
+  [...]
+  0x0804844f <+43>:	mov    eax,DWORD PTR [esp+0x3c]   ;el resultado de atoi() a eax
+  0x08048453 <+47>:	lea    ecx,[eax*4+0x0]            ;ecx = eax * 4
+  0x0804845a <+54>:	mov    eax,DWORD PTR [ebp+0xc]    ;argv[2]
+  0x0804845d <+57>:	add    eax,0x8                    
+  0x08048460 <+60>:	mov    eax,DWORD PTR [eax]        ;desreferenca eax
+  0x08048462 <+62>:	mov    edx,eax
+  0x08048464 <+64>:	lea    eax,[esp+0x14]             ;eax apunta a lo que parece una str que ha reservado en el stack frame de unos 40 bytes
+  0x08048468 <+68>:	mov    DWORD PTR [esp+0x8],ecx
+  0x0804846c <+72>:	mov    DWORD PTR [esp+0x4],edx
+  0x08048470 <+76>:	mov    DWORD PTR [esp],eax
+  0x08048473 <+79>:	call   0x8048320 <memcpy@plt>     ;llama a memcpy(str, argv[2]; num * 4) siendo num el resultado de atoi(argv[1])
+  [...]
+
+7.- Compara el num obtenido de atoi() con 0x574f4c46 (1464814662 en decimal) de ser num = 0x574f4c46 
+  ejecuta un execl() con "/bin/sh"
+  [...]
+  0x08048478 <+84>:	cmp    DWORD PTR [esp+0x3c],0x574f4c46      ;hace la comparacion de num con 0x574f4c46
+  0x08048480 <+92>:	jne    0x804849e <main+122>                 ;en caso de != 0x574f4c46 sale
+  0x08048482 <+94>:	mov    DWORD PTR [esp+0x8],0x0 
+  0x0804848a <+102>:	mov    DWORD PTR [esp+0x4],0x8048580
+  0x08048492 <+110>:	mov    DWORD PTR [esp],0x8048583          ;"/bin/sh"
+  0x08048499 <+117>:	call   0x8048350 <execl@plt>              ;"nos da una shell de bonus2"
+  [...]
+
+8.- Tenemos un problema "gordo" para poder ejecutar la shell necesitamos que num sea <= 9 y al mismo tiempo tiene que ser = 1464814662!!!
+  como esto es imposible hay que buscar otra solución.
+
+9.- Hacer un overflow sobre el puntero del primer parametro del memcpy es posible en cierto modo ya que el 3º parámetro del memcpy limita la cantidad
+  de bytes copiados. Esto bytes que se reciben, en este caso de argv[2], como el valor tiene que ser <= 9 para luego multiplicarlo x4 sólo nos permite
+  copiar 36 bytes lo que es insuficiente para poder hacer el overflow ya que como vemos reserva 0x40 para hacer y la string del primer parametro debe
+  ocupar unos 40 bytes
+  [...]
+  0x0804842a <+6>:	sub    esp,0x40           ;reserva de stack para variables locales
+  [...]
+  0x08048464 <+64>:	lea    eax,[esp+0x14]     ;donde empiez el str
+  [...]
+
+10.- Bueno tenemos hay una pequeña solución, hay un pequeño fallo y es que el atoi() devuelve un int pero la función memcpy() en su 3º argumento
+  recibe un size_t o lo que viene siendo un unsigned int.
+
+11.- Lo que va ha pasar es que el valor que metamos en argv[1] primero va ha ser interpretado como un int por medio del atoi(), luego ese valor
+  va ha ser interpretado como unsigned int en el memcpy(). Podemos buscar un valor negativo en argv[1] que al ser interpretado como unsigned
+  nos de tamaño suficiente para hacer el overflow.
+
+12.- Para buscar un valor negativo que al ser multiplicado x4 (cicle) y se convierta en un número positivo que permita obtener un valor adecuado para hacer
+  el overflow podemos utilizar un pequeño programa en c:
+    

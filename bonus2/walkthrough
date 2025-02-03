@@ -1,0 +1,36 @@
+1.- Procedimiento abitual y vemos 2 funciones de cierto interes
+  [...]
+  0x08048484  greetuser
+  0x08048529  main
+  [...]
+
+2.- Analicemos el main() lo que vemos es la construcion del stack frame y la reserva de 160 bytes
+  [...]
+  0x08048529 <+0>:	push   ebp                
+  0x0804852a <+1>:	mov    ebp,esp
+  0x0804852c <+3>:	push   edi
+  0x0804852d <+4>:	push   esi
+  0x0804852e <+5>:	push   ebx
+  0x0804852f <+6>:	and    esp,0xfffffff0     ;Alineamiento
+  0x08048532 <+9>:	sub    esp,0xa0           ;el stack mide 160 bytes 
+  [...]
+
+3.- Seguimos la ejecución y vemos que comprueba que argc sea 3 de lo contrario termina con 1
+  [...]
+  0x08048538 <+15>:	cmp    DWORD PTR [ebp+0x8],0x3  ;compara argc con 3
+  0x0804853c <+19>:	je     0x8048548 <main+31>      ;si es 3 continua
+  0x0804853e <+21>:	mov    eax,0x1                
+  0x08048543 <+26>:	jmp    0x8048630 <main+263>     ;salta al final del main y sale
+  [...]
+
+4.- Luego prepara una llamada a void *memset(void *s, int c, size_t n)
+  [...]
+  0x08048548 <+31>:	lea    ebx,[esp+0x50]               ;primer parametro de memset (void *s)
+  0x0804854c <+35>:	mov    eax,0x0                      ;segundo parámetro          (int c)
+  0x08048551 <+40>:	mov    edx,0x13                     ;tercer parametro           (size_t n) 
+  0x08048556 <+45>:	mov    edi,ebx
+  0x08048558 <+47>:	mov    ecx,edx
+  0x0804855a <+49>:	rep stos DWORD PTR es:[edi],eax     ;el memset()
+  [...]
+  El parámetro (size_t n) tenemos que calularlo multiplicando x4 el valor que le pasamos, en este caso 0x13
+  quedando (0x13 * 0x4) = 0x4c -> 76 en decimal, quedando la llamada  memset(buff, 0, 76);

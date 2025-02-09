@@ -89,9 +89,9 @@
     int input = 0;
 
     for (int result = 0; result <= 0 || result > 64; input--) {
-      result = input * 4; y listo
-      printf("input = %d\n", input);
+      result = input * 4;
     }
+    printf("input = %d\n", input);
   }
     
 13.- Ejecutando este programa obtenemos este valor -1073741809 que x4 corresponde a 60 como size_t

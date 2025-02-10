@@ -246,7 +246,7 @@ Program received signal SIGSEGV, Segmentation fault.
 0x0804851f <+155>:	mov    DWORD PTR [esp],eax
 [...]
 (gdb) b *0x0804851c
-(gdb) r AAAA BBBB
+(gdb) r $(python -c 'print "A"*40') BBBB <-- Hay que forzar a sobrescribir el null con argv[1]
 [...]
 (gdb) x/s $eax
 0xbffffb20:	"Goedemiddag! AAAA"

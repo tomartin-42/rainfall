@@ -108,7 +108,7 @@
   0x0804860b <+279>:	call   0x80483e0 <puts@plt>   ;puts(&buff[66])
   [...]
 
-14.- Es facil. Tenemos que inertar una cadena en argv[1] que al compararse con buff sean iguales para que nos de una shell
+14.- Es facil. Tenemos que insertar una cadena en argv[1] que al compararse con buff sean iguales para que nos de una shell
 
 15.- Si le pasamos como argumento una cadena vacia (./bonus3 "") el atoi devolverá 0 y buff[0] = 0, la cadena de argv[1] será tambien 0
   y se cumplirá la condición y tendremos la shell
